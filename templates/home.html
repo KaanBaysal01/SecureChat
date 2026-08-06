@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>SecureChat</h2>
+
+{% if user.is_authenticated %}
+    <p>Merhaba {{ user.username }}</p>
+    <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit">Çıkış yap</button>
+    </form>
+{% else %}
+    <p><a href="{% url 'accounts:login' %}">Giriş yap</a> veya <a href="{% url 'accounts:register' %}">kayıt ol</a></p>
+{% endif %}
+{% endblock %}
