@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Doğrulama{% endblock %}
+
+{% block content %}
+<h2>E-posta doğrulama</h2>
+
+<p><strong>{{ email }}</strong> adresine 6 haneli bir kod gönderdik.</p>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Doğrula</button>
+</form>
+
+<form method="post" action="{% url 'accounts:resend_code' %}">
+    {% csrf_token %}
+    <button type="submit">Yeni kod gönder</button>
+</form>
+{% endblock %}

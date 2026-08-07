@@ -6,6 +6,15 @@
 </head>
 <body>
     <div style="max-width: 500px; margin: 40px auto; font-family: sans-serif;">
+
+        {% if messages %}
+            <ul style="list-style: none; padding: 0;">
+            {% for message in messages %}
+                <li style="padding: 8px; margin-bottom: 8px; border: 1px solid #ccc;">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+
         {% block content %}{% endblock %}
     </div>
 </body>
