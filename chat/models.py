@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from .crypto import decrypt_message
 
 
 class Conversation(models.Model):
@@ -18,6 +19,10 @@ class Message(models.Model):
     is_delivered = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
+    @property
+    def content(self):
+        return decrypt_message(self.encrypted_content)
+    
     def __str__(self):
         return f"Message {self.id} from {self.sender}"

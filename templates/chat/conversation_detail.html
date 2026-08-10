@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Sohbet{% endblock %}
+
+{% block content %}
+<h2>Sohbet</h2>
+
+<div style="border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; min-height: 200px;">
+    {% for message in chat_messages %}
+        <p>
+            <strong>{{ message.sender.username }}</strong>
+            <small>{{ message.created_at|date:"H:i" }}</small><br>
+            {{ message.content }}
+        </p>
+    {% empty %}
+        <p>Henüz mesaj yok.</p>
+    {% endfor %}
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <input type="text" name="content" placeholder="Mesaj yaz..." autofocus style="width: 70%;">
+    <button type="submit">Gönder</button>
+</form>
+
+<p><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
+{% endblock %}

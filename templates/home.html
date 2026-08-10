@@ -5,6 +5,9 @@
 
 {% if user.is_authenticated %}
     <p>Merhaba {{ user.username }}</p>
+
+    <p><a href="{% url 'chat:conversation_list' %}">Sohbetlerim</a></p>
+
     <form method="post" action="{% url 'accounts:logout' %}">
         {% csrf_token %}
         <button type="submit">Çıkış yap</button>

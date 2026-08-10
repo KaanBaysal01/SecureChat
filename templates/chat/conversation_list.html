@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Sohbetler{% endblock %}
+
+{% block content %}
+<h2>Sohbetlerim</h2>
+
+{% for conversation in conversations %}
+    <p>
+        <a href="{% url 'chat:conversation_detail' conversation.id %}">
+            {% for p in conversation.participants.all %}
+                {% if p != user %}{{ p.username }}{% endif %}
+            {% endfor %}
+        </a>
+    </p>
+{% empty %}
+    <p>Henüz sohbetin yok. Admin panelden bir sohbet oluşturabilirsin.</p>
+{% endfor %}
+
+<p><a href="/">Ana sayfa</a></p>
+{% endblock %}

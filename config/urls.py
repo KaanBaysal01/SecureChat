@@ -7,6 +7,7 @@ from django.shortcuts import render
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
+    path("chat/", include("chat.urls")),
     path("", lambda request: render(request, "home.html"), name="home"),
 ]
 

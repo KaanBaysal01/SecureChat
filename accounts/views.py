@@ -1,9 +1,9 @@
 from django.shortcuts import render, redirect
-from .utils import create_and_send_code
 from django.contrib.auth import login
 from django.contrib import messages
 from .forms import RegisterForm, VerificationForm
 from .models import User, VerificationCode
+from .utils import create_and_send_code
 
 
 def register(request):
@@ -68,6 +68,7 @@ def verify(request):
         form = VerificationForm()
 
     return render(request, 'accounts/verify.html', {'form': form, 'email': user.email})
+
 
 def resend_code(request):
     user_id = request.session.get('pending_user_id')
