@@ -5,7 +5,7 @@
 {% block content %}
 <h2>Sohbet</h2>
 
-<div style="border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; min-height: 200px;">
+<div id="chat-log" style="border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; height: 300px; overflow-y: auto;">
     {% for message in chat_messages %}
         <p>
             <strong>{{ message.sender.username }}</strong>
@@ -17,11 +17,60 @@
     {% endfor %}
 </div>
 
-<form method="post">
-    {% csrf_token %}
-    <input type="text" name="content" placeholder="Mesaj yaz..." autofocus style="width: 70%;">
-    <button type="submit">Gönder</button>
-</form>
+<div>
+    <input type="text" id="chat-input" placeholder="Mesaj yaz..." autofocus style="width: 70%;">
+    <button id="chat-send">Gönder</button>
+</div>
+
+<p id="chat-status" style="font-size: 13px; color: #888;">bağlanıyor...</p>
 
 <p><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
+
+{{ conversation.id|json_script:"conversation-id" }}
+
+<script>
+    const conversationId = JSON.parse(document.getElementById('conversation-id').textContent);
+    const log = document.getElementById('chat-log');
+    const input = document.getElementById('chat-input');
+    const statusEl = document.getElementById('chat-status');
+
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const socket = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${conversationId}/`);
+
+    socket.onopen = function () {
+        statusEl.textContent = 'bağlı';
+    };
+
+    socket.onclose = function (e) {
+        statusEl.textContent = 'bağlantı kesildi (kod: ' + e.code + ')';
+    };
+
+    socket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+
+        const p = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = data.sender_username;
+        p.appendChild(strong);
+        p.appendChild(document.createElement('br'));
+        p.appendChild(document.createTextNode(data.message));
+
+        log.appendChild(p);
+        log.scrollTop = log.scrollHeight;
+    };
+
+    function sendMessage() {
+        const content = input.value.trim();
+        if (!content) return;
+        socket.send(JSON.stringify({ message: content }));
+        input.value = '';
+        input.focus();
+    }
+
+    document.getElementById('chat-send').addEventListener('click', sendMessage);
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
 {% endblock %}
