@@ -1,5 +1,8 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
+from channels.db import database_sync_to_async
+from .models import Conversation, Message
+from .crypto import encrypt_message
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -13,6 +16,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
         self.room_group_name = f"chat_{self.conversation_id}"
 
+        if not await self.user_in_conversation():
+            await self.close(code=4003)
+            return
+        
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
@@ -31,6 +38,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         message = data["message"]
 
+        await self.save_message(message)
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -45,3 +54,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message": event["message"],
             "sender_username": event["sender_username"],
         }))
+
+    @database_sync_to_async
+    def user_in_conversation(self):
+        return Conversation.objects.filter(
+            id=self.conversation_id,
+            participants=self.user,
+        ).exists()
+
+    @database_sync_to_async
+    def save_message(self, content):
+        return Message.objects.create(
+            conversation_id=self.conversation_id,
+            sender=self.user,
+            encrypted_content=encrypt_message(content),
+        )
