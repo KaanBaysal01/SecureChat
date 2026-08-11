@@ -19,6 +19,18 @@ class Message(models.Model):
     is_delivered = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    client_message_id = models.CharField(max_length=64, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['conversation', 'client_message_id'],
+                name='unique_client_message_per_conversation',
+            )
+        ]
+        indexes = [
+            models.Index(fields=['conversation', '-created_at']),
+        ]
     
     @property
     def content(self):

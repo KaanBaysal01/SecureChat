@@ -23,15 +23,6 @@ def conversation_detail(request, conversation_id):
         participants=request.user,
     )
 
-    if request.method == 'POST':
-        content = request.POST.get('content', '').strip()
-        if content:
-            Message.objects.create(
-                conversation=conversation,
-                sender=request.user,
-                encrypted_content=encrypt_message(content),
-            )
-        return redirect('chat:conversation_detail', conversation_id=conversation.id)
 
     chat_messages = conversation.messages.select_related('sender').order_by('created_at')
 

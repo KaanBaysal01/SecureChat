@@ -7,6 +7,8 @@ from .crypto import encrypt_message
 
 class ChatConsumer(AsyncWebsocketConsumer):
 
+    MAX_MESSAGE_LENGTH = 4000
+
     async def connect(self):
         self.user = self.scope["user"]
 
@@ -35,10 +37,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        message = data["message"]
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            return
 
-        await self.save_message(message)
+        message = (data.get("message") or "").strip()
+
+        if not message:
+            return
+
+        if len(message) > self.MAX_MESSAGE_LENGTH:
+            await self.send(text_data=json.dumps({
+                "error": "Mesaj çok uzun."
+            }))
+            return
+
+
+
+        client_message_id = data.get("client_message_id")
+
+        message_obj, created = await self.save_message(message, client_message_id)
+
+        if not created:
+            return
+
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -63,9 +86,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).exists()
 
     @database_sync_to_async
-    def save_message(self, content):
-        return Message.objects.create(
+    def save_message(self, content, client_message_id=None):
+        message, created = Message.objects.get_or_create(
             conversation_id=self.conversation_id,
-            sender=self.user,
-            encrypted_content=encrypt_message(content),
+            client_message_id=client_message_id,
+            defaults={
+                "sender": self.user,
+                "encrypted_content": encrypt_message(content),
+            },
         )
+        return message, created

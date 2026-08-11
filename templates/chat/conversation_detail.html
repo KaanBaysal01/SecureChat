@@ -62,7 +62,10 @@
     function sendMessage() {
         const content = input.value.trim();
         if (!content) return;
-        socket.send(JSON.stringify({ message: content }));
+        socket.send(JSON.stringify({
+            message: content,
+            client_message_id: crypto.randomUUID()
+        }));
         input.value = '';
         input.focus();
     }
