@@ -1,20 +1,30 @@
 {% extends "base.html" %}
-
 {% block title %}Doğrulama{% endblock %}
 
 {% block content %}
-<h2>E-posta doğrulama</h2>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title mb-3">E-posta doğrulama</h4>
+        <p class="text-muted"><strong>{{ email }}</strong> adresine 6 haneli bir kod gönderdik.</p>
 
-<p><strong>{{ email }}</strong> adresine 6 haneli bir kod gönderdik.</p>
+        <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Doğrula</button>
+        </form>
 
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Doğrula</button>
-</form>
-
-<form method="post" action="{% url 'accounts:resend_code' %}">
-    {% csrf_token %}
-    <button type="submit">Yeni kod gönder</button>
-</form>
+        <form method="post" action="{% url 'accounts:resend_code' %}" class="mt-3">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Yeni kod gönder</button>
+        </form>
+    </div>
+</div>
 {% endblock %}

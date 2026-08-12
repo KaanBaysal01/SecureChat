@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-
 {% block title %}Sohbetler{% endblock %}
 
 {% block content %}
-<h2>Sohbetlerim</h2>
-
-{% for conversation in conversations %}
-    <p>
-        <a href="{% url 'chat:conversation_detail' conversation.id %}">
-            {% for p in conversation.participants.all %}
-                {% if p != user %}{{ p.username }}{% endif %}
-            {% endfor %}
-        </a>
-    </p>
-{% empty %}
-    <p>Henüz sohbetin yok. Admin panelden bir sohbet oluşturabilirsin.</p>
-{% endfor %}
-
-<p><a href="/">Ana sayfa</a></p>
+<div class="card shadow-sm">
+    <div class="card-header"><strong>Sohbetlerim</strong></div>
+    <div class="list-group list-group-flush">
+        {% for conversation in conversations %}
+            <a href="{% url 'chat:conversation_detail' conversation.id %}"
+               class="list-group-item list-group-item-action">
+                {% for p in conversation.participants.all %}
+                    {% if p != user %}{{ p.username }}{% endif %}
+                {% endfor %}
+                <span class="text-muted small">· #{{ conversation.id }}</span>
+            </a>
+        {% empty %}
+            <div class="list-group-item text-muted">Henüz sohbetin yok.</div>
+        {% endfor %}
+    </div>
+</div>
 {% endblock %}

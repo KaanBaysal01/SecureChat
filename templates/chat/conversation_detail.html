@@ -3,30 +3,44 @@
 {% block title %}Sohbet{% endblock %}
 
 {% block content %}
-<h2>Sohbet</h2>
 
-<div id="chat-log" style="border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; height: 300px; overflow-y: auto;">
-    {% for message in chat_messages %}
-    <p id="msg-{{ message.id }}" data-sender="{{ message.sender.username }}">
-            <strong>{{ message.sender.username }}</strong>
-            <small>{{ message.created_at|date:"H:i" }}</small><br>
-            {{ message.content }}
-            {% if message.sender == user %}
-                <span class="read-mark" style="color: #888; font-size: 12px;">{% if message.is_read %}okundu{% endif %}</span>
-            {% endif %}
-        </p>
-    {% endfor %}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Sohbet</strong>
+        <span id="online-users" class="small text-muted"></span>
+    </div>
+
+    <div id="chat-log" class="card-body" style="height: 420px; overflow-y: auto;">
+        {% for message in chat_messages %}
+            <div id="msg-{{ message.id }}" data-sender="{{ message.sender.username }}"
+                 class="d-flex mb-2 {% if message.sender == user %}justify-content-end{% endif %}">
+                <div class="p-2 rounded-3 {% if message.sender == user %}bg-primary text-white{% else %}bg-light border{% endif %}"
+                     style="max-width: 75%;">
+                    <div class="small fw-semibold {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}">
+                        {{ message.sender.username }}
+                    </div>
+                    {{ message.content }}
+                    <div class="small text-end {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}">
+                        {{ message.created_at|date:"H:i" }}
+                        {% if message.sender == user %}
+                            <span class="read-mark">{% if message.is_read %}okundu{% endif %}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="card-footer">
+        <div class="input-group">
+            <input type="text" id="chat-input" class="form-control" placeholder="Mesaj yaz..." autofocus>
+            <button id="chat-send" class="btn btn-primary">Gönder</button>
+        </div>
+        <div id="chat-status" class="small text-muted mt-2">bağlanıyor...</div>
+    </div>
 </div>
 
-<div>
-    <input type="text" id="chat-input" placeholder="Mesaj yaz..." autofocus style="width: 70%;">
-    <button id="chat-send">Gönder</button>
-</div>
-
-<p id="chat-status" style="font-size: 13px; color: #888;">bağlanıyor...</p>
-<p id="online-users" style="font-size: 13px; color: #888;"></p>
-
-<p><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
+<p class="mt-3"><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
 
 {{ conversation.id|json_script:"conversation-id" }}
 {{ user.username|json_script:"current-username" }}
@@ -48,15 +62,16 @@
         }
     }
     renderOnline();
-
+    
+    log.scrollTop = log.scrollHeight;
+    
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${conversationId}/`);
 
     socket.onopen = function () {
         statusEl.textContent = 'bağlı';
-
-        log.querySelectorAll('p[id^="msg-"]').forEach(function (p) {
-            if (p.dataset.sender !== currentUsername) {
+        log.querySelectorAll('[id^="msg-"]').forEach(function (p) {  
+             if (p.dataset.sender !== currentUsername) {
                 const messageId = parseInt(p.id.replace('msg-', ''), 10);
                 socket.send(JSON.stringify({
                     type: 'mark_read',
@@ -74,23 +89,31 @@
         const data = JSON.parse(e.data);
 
         if (data.type === 'chat_message') {
-            const p = document.createElement('p');
-            p.id = 'msg-' + data.message_id;
-            p.dataset.sender = data.sender_username;
+            const isMine = data.sender_username === currentUsername;
 
-            const strong = document.createElement('strong');
-            strong.textContent = data.sender_username;
-            p.appendChild(strong);
-            p.appendChild(document.createElement('br'));
-            p.appendChild(document.createTextNode(data.message));
+            const wrapper = document.createElement('div');
+            wrapper.id = 'msg-' + data.message_id;
+            wrapper.dataset.sender = data.sender_username;
+            wrapper.className = 'd-flex mb-2' + (isMine ? ' justify-content-end' : '');
 
-            if (data.sender_username === currentUsername) {
+            const bubble = document.createElement('div');
+            bubble.className = 'p-2 rounded-3 ' + (isMine ? 'bg-primary text-white' : 'bg-light border');
+            bubble.style.maxWidth = '75%';
+
+            const name = document.createElement('div');
+            name.className = 'small fw-semibold ' + (isMine ? 'text-white-50' : 'text-muted');
+            name.textContent = data.sender_username;
+            bubble.appendChild(name);
+
+            bubble.appendChild(document.createTextNode(data.message));
+
+            const meta = document.createElement('div');
+            meta.className = 'small text-end ' + (isMine ? 'text-white-50' : 'text-muted');
+
+            if (isMine) {
                 const mark = document.createElement('span');
                 mark.className = 'read-mark';
-                mark.style.color = '#888';
-                mark.style.fontSize = '12px';
-                p.appendChild(document.createTextNode(' '));
-                p.appendChild(mark);
+                meta.appendChild(mark);
             } else {
                 socket.send(JSON.stringify({
                     type: 'mark_read',
@@ -98,7 +121,9 @@
                 }));
             }
 
-            log.appendChild(p);
+            bubble.appendChild(meta);
+            wrapper.appendChild(bubble);
+            log.appendChild(wrapper);
             log.scrollTop = log.scrollHeight;
 
         } else if (data.type === 'read_receipt') {

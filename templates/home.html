@@ -1,18 +1,17 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>SecureChat</h2>
-
-{% if user.is_authenticated %}
-    <p>Merhaba {{ user.username }}</p>
-
-    <p><a href="{% url 'chat:conversation_list' %}">Sohbetlerim</a></p>
-
-    <form method="post" action="{% url 'accounts:logout' %}">
-        {% csrf_token %}
-        <button type="submit">Çıkış yap</button>
-    </form>
-{% else %}
-    <p><a href="{% url 'accounts:login' %}">Giriş yap</a> veya <a href="{% url 'accounts:register' %}">kayıt ol</a></p>
-{% endif %}
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+        <h3>SecureChat</h3>
+        {% if user.is_authenticated %}
+            <p class="text-muted">Merhaba {{ user.username }}</p>
+            <a href="{% url 'chat:conversation_list' %}" class="btn btn-primary">Sohbetlerim</a>
+        {% else %}
+            <p class="text-muted">Şifreli, gerçek zamanlı mesajlaşma</p>
+            <a href="{% url 'accounts:login' %}" class="btn btn-primary">Giriş yap</a>
+            <a href="{% url 'accounts:register' %}" class="btn btn-outline-secondary">Kayıt ol</a>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}

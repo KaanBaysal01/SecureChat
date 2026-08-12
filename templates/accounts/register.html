@@ -1,15 +1,29 @@
 {% extends "base.html" %}
-
 {% block title %}Kayıt ol{% endblock %}
 
 {% block content %}
-<h2>Kayıt ol</h2>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title mb-3">Kayıt ol</h4>
 
-<form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Kayıt ol</button>
-</form>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                    {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text|safe }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Kayıt ol</button>
+        </form>
 
-<p>Zaten hesabın var mı? <a href="{% url 'accounts:login' %}">Giriş yap</a></p>
+        <p class="mt-3 mb-0 small">Zaten hesabın var mı? <a href="{% url 'accounts:login' %}">Giriş yap</a></p>
+    </div>
+</div>
 {% endblock %}
