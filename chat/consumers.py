@@ -29,8 +29,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "presence.update",
+                "username": self.user.username,
+                "status": "online",
+            }
+        )
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "presence.query",
+                "reply_to": self.channel_name,
+            }
+        )
+
     async def disconnect(self, close_code):
         if hasattr(self, "room_group_name"):
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "presence.update",
+                    "username": self.user.username,
+                    "status": "offline",
+                }
+            )
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
@@ -110,6 +135,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message_id": event["message_id"],
             "read_by": event["read_by"],
         }))
+    
+    async def presence_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "presence",
+            "username": event["username"],
+            "status": event["status"],
+        }))
+
+    async def presence_query(self, event):
+        if event["reply_to"] == self.channel_name:
+            return
+
+        await self.channel_layer.send(
+            event["reply_to"],
+            {
+                "type": "presence.update",
+                "username": self.user.username,
+                "status": "online",
+            }
+        )
 
     @database_sync_to_async
     def user_in_conversation(self):

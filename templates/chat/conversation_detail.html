@@ -24,6 +24,7 @@
 </div>
 
 <p id="chat-status" style="font-size: 13px; color: #888;">bağlanıyor...</p>
+<p id="online-users" style="font-size: 13px; color: #888;"></p>
 
 <p><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
 
@@ -36,6 +37,17 @@
     const log = document.getElementById('chat-log');
     const input = document.getElementById('chat-input');
     const statusEl = document.getElementById('chat-status');
+    const onlineEl = document.getElementById('online-users');
+    const onlineUsers = new Set();
+
+    function renderOnline() {
+        if (onlineUsers.size === 0) {
+            onlineEl.textContent = 'karşı taraf çevrimdışı';
+        } else {
+            onlineEl.textContent = 'çevrimiçi: ' + Array.from(onlineUsers).join(', ');
+        }
+    }
+    renderOnline();
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${conversationId}/`);
@@ -95,7 +107,17 @@
                 const mark = p.querySelector('.read-mark');
                 if (mark) mark.textContent = 'okundu';
             }
+        } else if (data.type === 'presence') {
+            if (data.username !== currentUsername) {
+                if (data.status === 'online') {
+                    onlineUsers.add(data.username);
+                } else {
+                    onlineUsers.delete(data.username);
+                }
+                renderOnline();
+            }
         }
+        
     };
 
     function sendMessage() {
