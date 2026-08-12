@@ -7,13 +7,14 @@
 
 <div id="chat-log" style="border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; height: 300px; overflow-y: auto;">
     {% for message in chat_messages %}
-        <p>
+    <p id="msg-{{ message.id }}" data-sender="{{ message.sender.username }}">
             <strong>{{ message.sender.username }}</strong>
             <small>{{ message.created_at|date:"H:i" }}</small><br>
             {{ message.content }}
+            {% if message.sender == user %}
+                <span class="read-mark" style="color: #888; font-size: 12px;">{% if message.is_read %}okundu{% endif %}</span>
+            {% endif %}
         </p>
-    {% empty %}
-        <p>Henüz mesaj yok.</p>
     {% endfor %}
 </div>
 
@@ -27,9 +28,11 @@
 <p><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
 
 {{ conversation.id|json_script:"conversation-id" }}
+{{ user.username|json_script:"current-username" }}
 
 <script>
     const conversationId = JSON.parse(document.getElementById('conversation-id').textContent);
+    const currentUsername = JSON.parse(document.getElementById('current-username').textContent);
     const log = document.getElementById('chat-log');
     const input = document.getElementById('chat-input');
     const statusEl = document.getElementById('chat-status');
@@ -39,6 +42,16 @@
 
     socket.onopen = function () {
         statusEl.textContent = 'bağlı';
+
+        log.querySelectorAll('p[id^="msg-"]').forEach(function (p) {
+            if (p.dataset.sender !== currentUsername) {
+                const messageId = parseInt(p.id.replace('msg-', ''), 10);
+                socket.send(JSON.stringify({
+                    type: 'mark_read',
+                    message_id: messageId
+                }));
+            }
+        });
     };
 
     socket.onclose = function (e) {
@@ -48,21 +61,48 @@
     socket.onmessage = function (e) {
         const data = JSON.parse(e.data);
 
-        const p = document.createElement('p');
-        const strong = document.createElement('strong');
-        strong.textContent = data.sender_username;
-        p.appendChild(strong);
-        p.appendChild(document.createElement('br'));
-        p.appendChild(document.createTextNode(data.message));
+        if (data.type === 'chat_message') {
+            const p = document.createElement('p');
+            p.id = 'msg-' + data.message_id;
+            p.dataset.sender = data.sender_username;
 
-        log.appendChild(p);
-        log.scrollTop = log.scrollHeight;
+            const strong = document.createElement('strong');
+            strong.textContent = data.sender_username;
+            p.appendChild(strong);
+            p.appendChild(document.createElement('br'));
+            p.appendChild(document.createTextNode(data.message));
+
+            if (data.sender_username === currentUsername) {
+                const mark = document.createElement('span');
+                mark.className = 'read-mark';
+                mark.style.color = '#888';
+                mark.style.fontSize = '12px';
+                p.appendChild(document.createTextNode(' '));
+                p.appendChild(mark);
+            } else {
+                socket.send(JSON.stringify({
+                    type: 'mark_read',
+                    message_id: data.message_id
+                }));
+            }
+
+            log.appendChild(p);
+            log.scrollTop = log.scrollHeight;
+
+        } else if (data.type === 'read_receipt') {
+            const p = document.getElementById('msg-' + data.message_id);
+            if (p) {
+                const mark = p.querySelector('.read-mark');
+                if (mark) mark.textContent = 'okundu';
+            }
+        }
     };
 
     function sendMessage() {
         const content = input.value.trim();
         if (!content) return;
         socket.send(JSON.stringify({
+            type: 'chat_message',
             message: content,
             client_message_id: crypto.randomUUID()
         }));
