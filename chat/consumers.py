@@ -72,6 +72,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.handle_chat_message(data)
         elif message_type == "mark_read":
             await self.handle_mark_read(data)
+        elif message_type == "delete_message":
+            await self.handle_delete_message(data)
 
     async def handle_chat_message(self, data):
         message = (data.get("message") or "").strip()
@@ -121,6 +123,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "read_count": read_count,
                             }
         )
+    
+    async def handle_delete_message(self, data):
+        message_id = data.get("message_id")
+        if not message_id:
+            return
+
+        deleted = await self.delete_message(message_id)
+        if not deleted:
+            return
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "message_deleted",
+                "message_id": message_id,
+            }
+        )
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
@@ -136,6 +155,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message_id": event["message_id"],
             "read_by": event["read_by"],
             "read_count":event["read_count"]
+        }))
+
+    async def message_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "message_deleted",
+            "message_id": event["message_id"],
         }))
     
     async def presence_update(self, event):
@@ -202,4 +227,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return MessageReadStatus.objects.filter(
             message__id = message_id
         ).count()
+
+    @database_sync_to_async
+    def delete_message(self, message_id):
+        deleted_count, _ = Message.objects.filter(
+            id=message_id,
+            conversation_id=self.conversation_id,
+            sender=self.user,
+        ).delete()
+
+        return deleted_count > 0
+
     

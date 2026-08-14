@@ -24,6 +24,7 @@
                         {{ message.created_at|date:"H:i" }}
                         {% if message.sender == user %}
                             <span class="read-mark">{% if message.read_count > 1 %}{{ message.read_count }} kişi okudu{% elif message.read_count == 1 %}okundu{% endif %}</span>
+                            <button type="button" class="delete-btn btn btn-sm btn-link text-white-50 p-0 ms-2" style="font-size: 11px;">sil</button>
                         {% endif %}
                     </div>
                 </div>
@@ -114,6 +115,13 @@
                 const mark = document.createElement('span');
                 mark.className = 'read-mark';
                 meta.appendChild(mark);
+
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'delete-btn btn btn-sm btn-link text-white-50 p-0 ms-2';
+                delBtn.style.fontSize = '11px';
+                delBtn.textContent = 'sil';
+                meta.appendChild(delBtn);
             } else {
                 socket.send(JSON.stringify({
                     type: 'mark_read',
@@ -132,6 +140,9 @@
                 const mark = p.querySelector('.read-mark');
                 if (mark) mark.textContent = data.read_count > 1 ? data.read_count + ' kişi okudu' : 'okundu';
             }
+        } else if (data.type === 'message_deleted') {
+            const el = document.getElementById('msg-' + data.message_id);
+            if (el) el.remove();
         } else if (data.type === 'presence') {
             if (data.username !== currentUsername) {
                 if (data.status === 'online') {
@@ -161,6 +172,20 @@
 
     input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') sendMessage();
+    });
+
+    log.addEventListener('click', function (e) {
+        const btn = e.target.closest('.delete-btn');
+        if (!btn) return;
+
+        const wrapper = btn.closest('[id^="msg-"]');
+        if (!wrapper) return;
+
+        const messageId = parseInt(wrapper.id.replace('msg-', ''), 10);
+        socket.send(JSON.stringify({
+            type: 'delete_message',
+            message_id: messageId
+        }));
     });
 </script>
 {% endblock %}
