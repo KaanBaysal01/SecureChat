@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Kullanıcılar{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header"><strong>Kullanıcılar</strong></div>
+
+    <div class="card-body border-bottom">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Kullanıcı ara...">
+            <button type="submit" class="btn btn-sm btn-primary">Ara</button>
+            {% if q %}
+                <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary">Temizle</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="list-group list-group-flush">
+        {% for u in users %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ u.username }}</span>
+                {% if u.id not in related_ids %}
+                    <form method="post" action="{% url 'accounts:send_friend_request' u.id %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Arkadaş ekle</button>
+                    </form>
+                {% else %}
+                    <span class="text-muted small">ilişkili</span>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div class="list-group-item text-muted">Başka kullanıcı yok.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

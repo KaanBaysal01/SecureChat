@@ -23,7 +23,7 @@
                     <div class="small text-end {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}">
                         {{ message.created_at|date:"H:i" }}
                         {% if message.sender == user %}
-                            <span class="read-mark">{% if message.is_read %}okundu{% endif %}</span>
+                            <span class="read-mark">{% if message.read_count > 1 %}{{ message.read_count }} kişi okudu{% elif message.read_count == 1 %}okundu{% endif %}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -64,7 +64,7 @@
     renderOnline();
     
     log.scrollTop = log.scrollHeight;
-    
+
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${conversationId}/`);
 
@@ -130,7 +130,7 @@
             const p = document.getElementById('msg-' + data.message_id);
             if (p) {
                 const mark = p.querySelector('.read-mark');
-                if (mark) mark.textContent = 'okundu';
+                if (mark) mark.textContent = data.read_count > 1 ? data.read_count + ' kişi okudu' : 'okundu';
             }
         } else if (data.type === 'presence') {
             if (data.username !== currentUsername) {

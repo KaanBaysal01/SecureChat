@@ -13,5 +13,12 @@ urlpatterns = [
         template_name='accounts/login.html',
         authentication_form=BootstrapAuthenticationForm,
     ), name='login'),
+    path('users/', views.user_list, name='user_list'),
+    path('friend-requests/', views.friend_requests, name='friend_requests'),
+    path('send-request/<int:user_id>/', views.send_friend_request, name='send_friend_request'),
+    path('accept-request/<int:request_id>/', views.accept_friend_request, name='accept_friend_request'),
+    path('reject-request/<int:request_id>/', views.reject_friend_request, name='reject_friend_request'),
+    path('friends/', views.friend_list, name='friend_list'),
+    path('remove-friend/<int:user_id>/', views.remove_friend, name='remove_friend'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]

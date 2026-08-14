@@ -1,9 +1,8 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
 from channels.db import database_sync_to_async
-from .models import Conversation, Message
 from .crypto import encrypt_message
-
+from .models import Conversation, Message, MessageReadStatus
 
 class ChatConsumer(AsyncWebsocketConsumer):
 
@@ -112,13 +111,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not updated:
             return
 
+        read_count = await self.get_read_count(message_id)
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "read_receipt",
                 "message_id": message_id,
                 "read_by": self.user.username,
-            }
+                "read_count": read_count,
+                            }
         )
 
     async def chat_message(self, event):
@@ -134,6 +135,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "type": "read_receipt",
             "message_id": event["message_id"],
             "read_by": event["read_by"],
+            "read_count":event["read_count"]
         }))
     
     async def presence_update(self, event):
@@ -177,8 +179,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def mark_message_read(self, message_id):
-        return Message.objects.filter(
+        message = Message.objects.filter(
             id=message_id,
             conversation_id=self.conversation_id,
-            is_read=False,
-        ).exclude(sender=self.user).update(is_read=True)
+        ).first()
+
+        if message is None:
+            return False
+
+        if message.sender_id == self.user.id:
+            return False
+        
+        status, created = MessageReadStatus.objects.get_or_create(
+            message=message,
+            user=self.user,
+        )
+
+        return created
+         
+    @database_sync_to_async
+    def get_read_count(self,message_id):
+        return MessageReadStatus.objects.filter(
+            message__id = message_id
+        ).count()
+    

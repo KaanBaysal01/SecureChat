@@ -27,3 +27,25 @@ class VerificationCode(models.Model):
 
     def __str__(self):
         return f"{self.user.username} — {self.code}"
+    
+class FriendRequest(models.Model):
+    from_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_request')
+    to_user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete = models.CASCADE,related_name = 'received_request')
+    STATUS_CHOICES = [
+        ('pending', 'Bekliyor'),
+        ('accepted', 'Kabul edildi'),
+        ('rejected', 'Reddedildi'),
+    ]
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['from_user', 'to_user'],
+                name='unique_friend_request',
+            )
+        ]
+    def __str__(self):
+        return f"{self.from_user} → {self.to_user} ({self.status})"
