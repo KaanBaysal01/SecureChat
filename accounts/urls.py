@@ -20,5 +20,6 @@ urlpatterns = [
     path('reject-request/<int:request_id>/', views.reject_friend_request, name='reject_friend_request'),
     path('friends/', views.friend_list, name='friend_list'),
     path('remove-friend/<int:user_id>/', views.remove_friend, name='remove_friend'),
+    path('profile/', views.profile, name='profile'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]

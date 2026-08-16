@@ -2,10 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .models import User, VerificationCode, FriendRequest
 from django.contrib.auth import login
 from django.contrib import messages
-from .forms import RegisterForm, VerificationForm
+from .forms import RegisterForm, VerificationForm, ProfileForm
 from .utils import create_and_send_code
 from django.contrib.auth.decorators import login_required
-
 
 def register(request):
     if request.method == 'POST':
@@ -233,3 +232,15 @@ def remove_friend(request, user_id):
     messages.info(request, f'{target.username} arkadaş listenden çıkarıldı.')
     return redirect('accounts:friend_list')
 
+@login_required
+def profile(request):
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profil güncellendi.')
+            return redirect('accounts:profile')
+    else:
+        form = ProfileForm(instance=request.user)
+
+    return render(request, 'accounts/profile.html', {'form': form})

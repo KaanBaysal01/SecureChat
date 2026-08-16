@@ -5,20 +5,39 @@
 {% block content %}
 
 <div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>Sohbet</strong>
-        <span id="online-users" class="small text-muted"></span>
+    <div class="card-header d-flex align-items-center gap-3 py-3">
+        <a href="{% url 'chat:conversation_list' %}" class="text-decoration-none text-muted fs-5" title="Geri">&lsaquo;</a>
+
+        {% if conversation.is_group %}
+            <div class="rounded-circle bg-secondary-subtle text-secondary-emphasis d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width: 40px; height: 40px;">G</div>
+        {% elif others.0.profile_photo %}
+            <img src="{{ others.0.profile_photo.url }}" alt="" class="rounded-circle flex-shrink-0"
+                 style="width: 40px; height: 40px; object-fit: cover;">
+        {% else %}
+            <div class="rounded-circle bg-primary-subtle text-primary-emphasis d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width: 40px; height: 40px;">{{ title|first|upper }}</div>
+        {% endif %}
+
+        <div class="flex-grow-1 min-width-0">
+            <div class="fw-semibold text-truncate">{{ title }}</div>
+            <div id="online-users" class="small text-muted"></div>
+            {% if subtitle %}<div class="small text-muted text-truncate">{{ subtitle }}</div>{% endif %}
+        </div>
     </div>
 
-    <div id="chat-log" class="card-body" style="height: 420px; overflow-y: auto;">
+    <div id="chat-log" class="card-body" style="height: 460px; overflow-y: auto; background: #f4f5f7;">
         {% for message in chat_messages %}
+            {% ifchanged message.created_at|date:"Y-m-d" %}
+                <div class="date-divider"><span>{{ message.created_at|date:"d F Y" }}</span></div>
+            {% endifchanged %}
             <div id="msg-{{ message.id }}" data-sender="{{ message.sender.username }}"
                  class="d-flex mb-2 {% if message.sender == user %}justify-content-end{% endif %}">
-                <div class="p-2 rounded-3 {% if message.sender == user %}bg-primary text-white{% else %}bg-light border{% endif %}"
+                <div class="px-3 py-2 rounded-4 shadow-sm {% if message.sender == user %}bg-primary text-white{% else %}bg-white border{% endif %}"
                      style="max-width: 75%;">
-                    <div class="small fw-semibold {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}">
-                        {{ message.sender.username }}
-                    </div>
+                    {% if message.sender != user %}
+                        <div class="small fw-semibold text-primary-emphasis mb-1">{{ message.sender.username }}</div>
+                    {% endif %}
                     {{ message.content }}
                     <div class="small text-end {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}">
                         {{ message.created_at|date:"H:i" }}
@@ -29,19 +48,19 @@
                     </div>
                 </div>
             </div>
+        {% empty %}
+            <div class="text-center text-muted py-5">Henüz mesaj yok. İlk mesajı sen gönder.</div>
         {% endfor %}
     </div>
 
-    <div class="card-footer">
+    <div class="card-footer bg-white">
         <div class="input-group">
-            <input type="text" id="chat-input" class="form-control" placeholder="Mesaj yaz..." autofocus>
-            <button id="chat-send" class="btn btn-primary">Gönder</button>
+            <input type="text" id="chat-input" class="form-control rounded-start-pill" placeholder="Mesaj yaz..." autofocus>
+            <button id="chat-send" class="btn btn-primary rounded-end-pill px-4">Gönder</button>
         </div>
         <div id="chat-status" class="small text-muted mt-2">bağlanıyor...</div>
     </div>
 </div>
-
-<p class="mt-3"><a href="{% url 'chat:conversation_list' %}">Sohbetlere dön</a></p>
 
 {{ conversation.id|json_script:"conversation-id" }}
 {{ user.username|json_script:"current-username" }}
@@ -98,13 +117,15 @@
             wrapper.className = 'd-flex mb-2' + (isMine ? ' justify-content-end' : '');
 
             const bubble = document.createElement('div');
-            bubble.className = 'p-2 rounded-3 ' + (isMine ? 'bg-primary text-white' : 'bg-light border');
+            bubble.className = 'px-3 py-2 rounded-4 shadow-sm ' + (isMine ? 'bg-primary text-white' : 'bg-white border');
             bubble.style.maxWidth = '75%';
 
-            const name = document.createElement('div');
-            name.className = 'small fw-semibold ' + (isMine ? 'text-white-50' : 'text-muted');
-            name.textContent = data.sender_username;
-            bubble.appendChild(name);
+            if (!isMine) {
+                const name = document.createElement('div');
+                name.className = 'small fw-semibold text-primary-emphasis mb-1';
+                name.textContent = data.sender_username;
+                bubble.appendChild(name);
+            }
 
             bubble.appendChild(document.createTextNode(data.message));
 

@@ -11,8 +11,33 @@ def conversation_list(request):
         participants=request.user
     ).prefetch_related('participants').order_by('-created_at')
 
+    items = []
+    for c in conversations:
+        last = c.messages.select_related('sender').last()
+
+        unread = c.messages.exclude(sender=request.user).exclude(
+            read_statuses__user=request.user
+        ).count()
+
+        others = [p for p in c.participants.all() if p != request.user]
+
+        if c.is_group:
+            title = c.name or f"Grup #{c.id}"
+        elif others:
+            title = others[0].username
+        else:
+            title = f"Sohbet #{c.id}"
+
+        items.append({
+            'conversation': c,
+            'last': last,
+            'unread': unread,
+            'others': others,
+            'title': title,
+        })
+
     return render(request, 'chat/conversation_list.html', {
-        'conversations': conversations,
+        'items': items,
     })
 
 
@@ -27,9 +52,24 @@ def conversation_detail(request, conversation_id):
 
     chat_messages = conversation.messages.select_related('sender').order_by('created_at')
 
+    others = [p for p in conversation.participants.all() if p != request.user]
+
+    if conversation.is_group:
+        title = conversation.name or f"Grup #{conversation.id}"
+        subtitle = ", ".join(p.username for p in others)
+    elif others:
+        title = others[0].username
+        subtitle = ""
+    else:
+        title = f"Sohbet #{conversation.id}"
+        subtitle = ""
+
     return render(request, 'chat/conversation_detail.html', {
         'conversation': conversation,
         'chat_messages': chat_messages,
+        'others': others,
+        'title': title,
+        'subtitle': subtitle,
     })
 
 @login_required

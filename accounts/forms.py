@@ -32,3 +32,8 @@ class VerificationForm(BootstrapFormMixin, forms.Form):
 
 class BootstrapAuthenticationForm(BootstrapFormMixin, AuthenticationForm):
     pass
+
+class ProfileForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ('email', 'profile_photo')

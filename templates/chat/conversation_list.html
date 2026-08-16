@@ -2,22 +2,60 @@
 {% block title %}Sohbetler{% endblock %}
 
 {% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="page-title">Sohbetler</h1>
+    <a href="{% url 'chat:new_conversation' %}" class="btn btn-sm btn-primary">Yeni sohbet</a>
+</div>
+
 <div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>Sohbetlerim</strong>
-        <a href="{% url 'chat:new_conversation' %}" class="btn btn-sm btn-primary">Yeni sohbet</a>
-    </div>
     <div class="list-group list-group-flush">
-        {% for conversation in conversations %}
-            <a href="{% url 'chat:conversation_detail' conversation.id %}"
-               class="list-group-item list-group-item-action">
-                {% for p in conversation.participants.all %}
-                    {% if p != user %}{{ p.username }}{% endif %}
-                {% endfor %}
-                <span class="text-muted small">· #{{ conversation.id }}</span>
+        {% for item in items %}
+            <a href="{% url 'chat:conversation_detail' item.conversation.id %}"
+               class="list-group-item list-group-item-action py-3">
+                <div class="d-flex align-items-center gap-3">
+
+                    {% if item.conversation.is_group %}
+                        <div class="rounded-circle bg-secondary-subtle text-secondary-emphasis d-flex align-items-center justify-content-center flex-shrink-0"
+                             style="width: 48px; height: 48px; font-size: 18px;">G</div>
+                    {% elif item.others.0.profile_photo %}
+                        <img src="{{ item.others.0.profile_photo.url }}" alt=""
+                             class="rounded-circle flex-shrink-0"
+                             style="width: 48px; height: 48px; object-fit: cover;">
+                    {% else %}
+                        <div class="rounded-circle bg-primary-subtle text-primary-emphasis d-flex align-items-center justify-content-center flex-shrink-0"
+                             style="width: 48px; height: 48px; font-size: 20px;">
+                            {{ item.title|first|upper }}
+                        </div>
+                    {% endif %}
+
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="d-flex justify-content-between align-items-baseline">
+                            <span class="fw-semibold text-truncate">{{ item.title }}</span>
+                            {% if item.last %}
+                                <small class="text-muted flex-shrink-0 ms-2">{{ item.last.created_at|date:"H:i" }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted text-truncate">
+                                {% if item.last %}
+                                    {% if item.last.sender == user %}Sen: {% endif %}{{ item.last.content|truncatechars:45 }}
+                                {% else %}
+                                    Henüz mesaj yok
+                                {% endif %}
+                            </small>
+                            {% if item.unread %}
+                                <span class="badge rounded-pill bg-primary flex-shrink-0 ms-2">{{ item.unread }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                </div>
             </a>
         {% empty %}
-            <div class="list-group-item text-muted">Henüz sohbetin yok.</div>
+            <div class="list-group-item text-center text-muted py-5">
+                <div class="mb-2">Henüz sohbetin yok.</div>
+                <a href="{% url 'chat:new_conversation' %}" class="btn btn-sm btn-outline-primary">İlk sohbetini başlat</a>
+            </div>
         {% endfor %}
     </div>
 </div>
