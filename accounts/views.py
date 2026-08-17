@@ -5,6 +5,9 @@ from django.contrib import messages
 from .forms import RegisterForm, VerificationForm, ProfileForm
 from .utils import create_and_send_code
 from django.contrib.auth.decorators import login_required
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
+
 
 def register(request):
     if request.method == 'POST':
@@ -85,152 +88,145 @@ def resend_code(request):
     messages.success(request, 'Yeni kod gönderildi.')
     return redirect('accounts:verify')
 
-@login_required
-def user_list(request):
-    q = request.GET.get('q', '').strip()
+class UserListView(LoginRequiredMixin,View):
+    def get(self,request):
+        q = request.GET.get('q', '').strip()
 
-    users = User.objects.exclude(id=request.user.id)
-    if q:
-        users = users.filter(username__icontains=q)
-    
-    sent_ids = FriendRequest.objects.filter(
-        from_user=request.user,
-        status__in=['pending', 'accepted'],
-    ).values_list('to_user_id', flat=True)
+        users = User.objects.exclude(id=request.user.id)
+        if q:
+            users = users.filter(username__icontains=q)
+        
+        sent_ids = FriendRequest.objects.filter(
+            from_user=request.user,
+            status__in=['pending', 'accepted'],
+        ).values_list('to_user_id', flat=True)
 
-    received_ids = FriendRequest.objects.filter(
-        to_user=request.user,
-        status__in=['pending', 'accepted'],
-    ).values_list('from_user_id', flat=True)
+        received_ids = FriendRequest.objects.filter(
+            to_user=request.user,
+            status__in=['pending', 'accepted'],
+        ).values_list('from_user_id', flat=True)
 
-    related_ids = set(sent_ids) | set(received_ids)
+        related_ids = set(sent_ids) | set(received_ids)
 
-    return render(request, 'accounts/user_list.html', {
-        'users': users,
-        'related_ids': related_ids,
-        'q':q,
-    })
+        return render(request, 'accounts/user_list.html', {
+            'users': users,
+            'related_ids': related_ids,
+            'q':q,
+        })
 
-@login_required
-def send_friend_request(request, user_id):
-    if request.method != 'POST':
+class SendFriendRequestView(LoginRequiredMixin, View):
+    def post(self, request, user_id):
+        target = get_object_or_404(User, id=user_id)
+
+        if target == request.user:
+            messages.error(request, 'Kendine istek gönderemezsin.')
+            return redirect('accounts:user_list')
+
+        friend_request, created = FriendRequest.objects.get_or_create(
+            from_user=request.user,
+            to_user= target,
+        )
+
+        if created:
+            messages.success(request, f'{target.username} kullanıcısına istek gönderildi.')
+        elif friend_request.status == 'rejected':
+            friend_request.status = 'pending'
+            friend_request.save()
+            messages.success(request, f'{target.username} kullanıcısına istek tekrar gönderildi.')
+        elif friend_request.status == 'accepted':
+            messages.info(request, f'{target.username} ile zaten arkadaşsınız.')
+        else:
+            messages.info(request, 'Zaten istek göndermişsin.')
+
         return redirect('accounts:user_list')
 
-    target = get_object_or_404(User, id=user_id)
 
-    if target == request.user:
-        messages.error(request, 'Kendine istek gönderemezsin.')
-        return redirect('accounts:user_list')
+class FriendRequestView(LoginRequiredMixin,View):
+    def get(self,request):
+            incoming = FriendRequest.objects.filter(
+            to_user=request.user,
+            status='pending',
+            ).select_related('from_user')
 
-    friend_request, created = FriendRequest.objects.get_or_create(
-        from_user=request.user,
-        to_user= target,
-    )
+            return render(request, 'accounts/friend_requests.html', {
+            'incoming': incoming,
+            })
 
-    if created:
-        messages.success(request, f'{target.username} kullanıcısına istek gönderildi.')
-    elif friend_request.status == 'rejected':
-        friend_request.status = 'pending'
+class AcceptFriendRequestView(LoginRequiredMixin,View):
+    def post(self,request,request_id):
+        
+        friend_request = get_object_or_404(
+            FriendRequest,
+            id=request_id,
+            to_user=request.user,
+            status='pending',
+        )
+
+        friend_request.status = 'accepted'
         friend_request.save()
-        messages.success(request, f'{target.username} kullanıcısına istek tekrar gönderildi.')
-    elif friend_request.status == 'accepted':
-        messages.info(request, f'{target.username} ile zaten arkadaşsınız.')
-    else:
-        messages.info(request, 'Zaten istek göndermişsin.')
 
-    return redirect('accounts:user_list')
-
-@login_required
-def friend_requests(request):
-    incoming = FriendRequest.objects.filter(
-        to_user=request.user,
-        status='pending',
-    ).select_related('from_user')
-
-    return render(request, 'accounts/friend_requests.html', {
-        'incoming': incoming,
-    })
-
-@login_required
-def accept_friend_request(request, request_id):
-    if request.method != 'POST':
-        return redirect('accounts:friend_requests')
-
-    friend_request = get_object_or_404(
-        FriendRequest,
-        id=request_id,
-        to_user=request.user,
-        status='pending',
-    )
-
-    friend_request.status = 'accepted'
-    friend_request.save()
-
-    messages.success(request, f'{friend_request.from_user.username} artık arkadaşın.')
-    return redirect('accounts:friend_requests')
-
-@login_required
-def reject_friend_request(request,request_id):
-    if request.method != 'POST':
+        messages.success(request, f'{friend_request.from_user.username} artık arkadaşın.')
         return redirect('accounts:friend_requests')
     
-    friend_request = get_object_or_404(
-        FriendRequest,
-        id=request_id,
-        to_user=request.user,
-        status='pending',
-    )
+class RejectFriendRequestView(LoginRequiredMixin,View):
+    def post(self,request,request_id):
+        
+        friend_request = get_object_or_404(
+            FriendRequest,
+            id=request_id,
+            to_user=request.user,
+            status='pending',
+        )
 
-    friend_request.status = 'rejected'
-    friend_request.save()
-    
-    messages.info(request, f'{friend_request.from_user.username} kullanıcısının isteği reddedildi.')
-    return redirect('accounts:friend_requests')
+        friend_request.status = 'rejected'
+        friend_request.save()
+        
+        messages.info(request, f'{friend_request.from_user.username} kullanıcısının isteği reddedildi.')
+        return redirect('accounts:friend_requests')
 
 
-@login_required
-def friend_list(request):
-    sent = FriendRequest.objects.filter(
-        from_user=request.user,
-        status='accepted',
-    ).select_related('to_user')
+class FriendListView(LoginRequiredMixin, View):
+    def get(self, request):
+        sent = FriendRequest.objects.filter(
+            from_user=request.user,
+            status='accepted',
+        ).select_related('to_user')
 
-    received = FriendRequest.objects.filter(
-        to_user=request.user,
-        status='accepted',
-    ).select_related('from_user')
+        received = FriendRequest.objects.filter(
+            to_user=request.user,
+            status='accepted',
+        ).select_related('from_user')
 
-    friends = []
-    for fr in sent:
-        friends.append(fr.to_user)
-    for fr in received:
-        friends.append(fr.from_user)
+        friends = []
+        for fr in sent:
+            friends.append(fr.to_user)
+        for fr in received:
+            friends.append(fr.from_user)
 
-    return render(request, 'accounts/friend_list.html', {
-        'friends': friends,
-    })
+        return render(request, 'accounts/friend_list.html', {
+            'friends': friends,
+        })
 
-@login_required
-def remove_friend(request, user_id):
-    if request.method != 'POST':
+class RemoveFriendView(LoginRequiredMixin,View):
+    def post(self,request,user_id):
+        
+        target = get_object_or_404(User, id=user_id)
+
+        FriendRequest.objects.filter(
+            from_user=request.user,
+            to_user=target,
+            status='accepted',
+        ).delete()
+
+        FriendRequest.objects.filter(
+            from_user=target,
+            to_user=request.user,
+            status='accepted',
+        ).delete()
+
+        messages.info(request, f'{target.username} arkadaş listenden çıkarıldı.')
         return redirect('accounts:friend_list')
 
-    target = get_object_or_404(User, id=user_id)
-
-    FriendRequest.objects.filter(
-        from_user=request.user,
-        to_user=target,
-        status='accepted',
-    ).delete()
-
-    FriendRequest.objects.filter(
-        from_user=target,
-        to_user=request.user,
-        status='accepted',
-    ).delete()
-
-    messages.info(request, f'{target.username} arkadaş listenden çıkarıldı.')
-    return redirect('accounts:friend_list')
 
 @login_required
 def profile(request):
