@@ -2,9 +2,9 @@
 {% block title %}Kullanıcılar{% endblock %}
 
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header"><strong>Kullanıcılar</strong></div>
+<h1 class="page-title mb-3">Keşfet</h1>
 
+<div class="card shadow-sm">
     <div class="card-body border-bottom">
         <form method="get" class="d-flex gap-2">
             <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Kullanıcı ara...">
@@ -16,9 +16,18 @@
     </div>
 
     <div class="list-group list-group-flush">
-        {% for u in users %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <span>{{ u.username }}</span>
+        {% for u in page_obj %}
+            <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center gap-3">
+                    {% if u.profile_photo %}
+                        <img src="{{ u.profile_photo.url }}" alt="" class="avatar rounded-circle" style="width: 40px; height: 40px;">
+                    {% else %}
+                        <span class="rounded-circle bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center justify-content-center"
+                              style="width: 40px; height: 40px; font-weight: 600;">{{ u.username|first|upper }}</span>
+                    {% endif %}
+                    <span class="fw-semibold">{{ u.username }}</span>
+                </div>
+
                 {% if u.id not in related_ids %}
                     <form method="post" action="{% url 'accounts:send_friend_request' u.id %}" class="m-0">
                         {% csrf_token %}
@@ -29,8 +38,28 @@
                 {% endif %}
             </div>
         {% empty %}
-            <div class="list-group-item text-muted">Başka kullanıcı yok.</div>
+            <div class="list-group-item text-muted text-center py-4">
+                {% if q %}"{{ q }}" için sonuç bulunamadı.{% else %}Başka kullanıcı yok.{% endif %}
+            </div>
         {% endfor %}
     </div>
+
+    {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}" class="btn btn-sm btn-outline-secondary">Önceki</a>
+            {% else %}
+                <span></span>
+            {% endif %}
+
+            <small class="text-muted">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</small>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}" class="btn btn-sm btn-outline-secondary">Sonraki</a>
+            {% else %}
+                <span></span>
+            {% endif %}
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

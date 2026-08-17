@@ -6,6 +6,7 @@ from .forms import RegisterForm, VerificationForm, ProfileForm
 from .utils import create_and_send_code
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 
 
 class RegisterView(View):
@@ -111,6 +112,11 @@ class UserListView(LoginRequiredMixin, View):
         if q:
             users = users.filter(username__icontains=q)
 
+        users = users.order_by("username")
+
+        paginator = Paginator(users, 10)
+        page_obj = paginator.get_page(request.GET.get("page"))
+
         sent_ids = FriendRequest.objects.filter(
             from_user=request.user,
             status__in=["pending", "accepted"],
@@ -127,7 +133,7 @@ class UserListView(LoginRequiredMixin, View):
             request,
             "accounts/user_list.html",
             {
-                "users": users,
+                "page_obj": page_obj,
                 "related_ids": related_ids,
                 "q": q,
             },
