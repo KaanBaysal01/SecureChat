@@ -71,6 +71,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.handle_mark_read(data)
         elif message_type == "delete_message":
             await self.handle_delete_message(data)
+        elif message_type == 'typing':
+            await self.handle_typing(data)
 
     async def handle_chat_message(self, data):
         message = (data.get("message") or "").strip()
@@ -104,7 +106,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "sender_username": self.user.username,
             },
         )
-
+    
     async def handle_mark_read(self, data):
         message_id = data.get("message_id")
         if not message_id:
@@ -142,6 +144,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def handle_typing(self, data):
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "typing.status",
+                "username": self.user.username,
+                "is_typing": bool(data.get("is_typing")),
+            },
+        )
+
     async def chat_message(self, event):
         await self.send(
             text_data=json.dumps(
@@ -172,6 +184,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "message_deleted",
                     "message_id": event["message_id"],
+                }
+            )
+        )
+
+    async def typing_status(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "typing",
+                    "username": event["username"],
+                    "is_typing": event["is_typing"],
                 }
             )
         )

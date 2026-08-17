@@ -58,6 +58,7 @@
             <input type="text" id="chat-input" class="form-control rounded-start-pill" placeholder="Mesaj yaz..." autofocus>
             <button id="chat-send" class="btn btn-primary rounded-end-pill px-4">Gönder</button>
         </div>
+        <div id="typing-indicator" class="small text-muted" style="height: 18px;"></div>
         <div id="chat-status" class="small text-muted mt-2">bağlanıyor...</div>
     </div>
 </div>
@@ -73,6 +74,18 @@
     const statusEl = document.getElementById('chat-status');
     const onlineEl = document.getElementById('online-users');
     const onlineUsers = new Set();
+    const typingEl = document.getElementById('typing-indicator');
+    const typingUsers = new Set();
+
+    function renderTyping() {
+        if (typingUsers.size === 0) {
+            typingEl.textContent = '';
+        } else if (typingUsers.size === 1) {
+            typingEl.textContent = Array.from(typingUsers)[0] + ' yazıyor...';
+        } else {
+            typingEl.textContent = typingUsers.size + ' kişi yazıyor...';
+        }
+    }
 
     function renderOnline() {
         if (onlineUsers.size === 0) {
@@ -170,8 +183,19 @@
                     onlineUsers.add(data.username);
                 } else {
                     onlineUsers.delete(data.username);
+                    typingUsers.delete(data.username);
+                    renderTyping();
                 }
                 renderOnline();
+            }
+        } else if (data.type === 'typing') {
+            if (data.username !== currentUsername) {
+                if (data.is_typing) {
+                    typingUsers.add(data.username);
+                } else {
+                    typingUsers.delete(data.username);
+                }
+                renderTyping();
             }
         }
         
@@ -186,8 +210,29 @@
             client_message_id: crypto.randomUUID()
         }));
         input.value = '';
+        stopTyping();
         input.focus();
     }
+
+    let typingTimer = null;
+    let amTyping = false;
+
+    function stopTyping() {
+        if (!amTyping) return;
+        amTyping = false;
+        clearTimeout(typingTimer);
+        socket.send(JSON.stringify({ type: 'typing', is_typing: false }));
+    }
+
+    input.addEventListener('input', function () {
+        if (!amTyping) {
+            amTyping = true;
+            socket.send(JSON.stringify({ type: 'typing', is_typing: true }));
+        }
+
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(stopTyping, 2000);
+    });
 
     document.getElementById('chat-send').addEventListener('click', sendMessage);
 
