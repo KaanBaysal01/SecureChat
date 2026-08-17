@@ -6,10 +6,11 @@ from .forms import BootstrapAuthenticationForm
 app_name = 'accounts'
 
 urlpatterns = [
-    path('register/', views.register, name='register'),
-    path('verify/', views.verify, name='verify'),
-    path('resend-code/', views.resend_code, name='resend_code'),
-    path('login/', auth_views.LoginView.as_view(
+    path('register/', views.RegisterView.as_view(), name='register'),
+    path('verify/', views.VerifyView.as_view(), name='verify'),
+    path('resend-code/', views.ResendCodeView.as_view(), name='resend_code'),
+    path('profile/', views.ProfileView.as_view(), name='profile'),
+        path('login/', auth_views.LoginView.as_view(
         template_name='accounts/login.html',
         authentication_form=BootstrapAuthenticationForm,
     ), name='login'),
@@ -20,6 +21,5 @@ urlpatterns = [
     path('reject-request/<int:request_id>/', views.RejectFriendRequestView.as_view(), name='reject_friend_request'),
     path('friends/', views.FriendListView.as_view(), name='friend_list'),
     path('remove-friend/<int:user_id>/', views.RemoveFriendView.as_view(), name='remove_friend'),
-    path('profile/', views.profile, name='profile'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]

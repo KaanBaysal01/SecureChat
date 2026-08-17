@@ -8,9 +8,12 @@ from django.contrib.auth.decorators import login_required
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
 
+class RegisterView(View):
+    def get(self,request):
+        form = RegisterForm()
+        return render(request, 'accounts/register.html', {'form': form})
 
-def register(request):
-    if request.method == 'POST':
+    def post(self,request):
         form = RegisterForm(request.POST, request.FILES)
         if form.is_valid():
             user = form.save(commit=False)
@@ -21,28 +24,34 @@ def register(request):
 
             request.session['pending_user_id'] = user.id
             return redirect('accounts:verify')
-    else:
-        form = RegisterForm()
 
-    return render(request, 'accounts/register.html', {'form': form})
+        return render(request, 'accounts/register.html', {'form': form})
 
 
-def verify(request):
-    user_id = request.session.get('pending_user_id')
-    if not user_id:
-        return redirect('accounts:register')
+class VerifyView(View):
+    def dispatch(self, request, *args, **kwargs):
+        user_id = request.session.get('pending_user_id')
+        if not user_id:
+            return redirect('accounts:register')
 
-    user = User.objects.filter(id=user_id, is_active=False).first()
-    if not user:
-        return redirect('accounts:register')
+        self.user = User.objects.filter(id=user_id, is_active=False).first()
+        if not self.user:
+            return redirect('accounts:register')
 
-    if request.method == 'POST':
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        form = VerificationForm()
+        return render(request, 'accounts/verify.html', {'form': form, 'email': self.user.email})
+
+    def post(self, request):
         form = VerificationForm(request.POST)
+
         if form.is_valid():
             entered_code = form.cleaned_data['code']
 
             code_obj = VerificationCode.objects.filter(
-                user=user, is_used=False
+                user=self.user, is_used=False
             ).order_by('-created_at').first()
 
             if not code_obj:
@@ -55,11 +64,11 @@ def verify(request):
                 code_obj.is_used = True
                 code_obj.save()
 
-                user.is_active = True
-                user.save()
+                self.user.is_active = True
+                self.user.save()
 
                 del request.session['pending_user_id']
-                login(request, user)
+                login(request, self.user)
                 messages.success(request, 'Hesabınız doğrulandı.')
                 return redirect('/')
             else:
@@ -67,26 +76,26 @@ def verify(request):
                 code_obj.save()
                 kalan = 5 - code_obj.attempt_count
                 messages.error(request, f'Kod hatalı. Kalan deneme hakkı: {kalan}')
-    else:
-        form = VerificationForm()
 
-    return render(request, 'accounts/verify.html', {'form': form, 'email': user.email})
+        return render(request, 'accounts/verify.html', {'form': form, 'email': self.user.email})
 
 
-def resend_code(request):
-    user_id = request.session.get('pending_user_id')
-    if not user_id:
-        return redirect('accounts:register')
+class ResendCodeView(View):
+    def post(self,request):
+        user_id = request.session.get('pending_user_id')
+        if not user_id:
+            return redirect('accounts:register')
 
-    user = User.objects.filter(id=user_id, is_active=False).first()
-    if not user:
-        return redirect('accounts:register')
+        user = User.objects.filter(id=user_id, is_active=False).first()
+        if not user:
+            return redirect('accounts:register')
 
-    VerificationCode.objects.filter(user=user, is_used=False).update(is_used=True)
-    create_and_send_code(user)
+        VerificationCode.objects.filter(user=user, is_used=False).update(is_used=True)
+        create_and_send_code(user)
 
-    messages.success(request, 'Yeni kod gönderildi.')
-    return redirect('accounts:verify')
+        messages.success(request, 'Yeni kod gönderildi.')
+        return redirect('accounts:verify')
+
 
 class UserListView(LoginRequiredMixin,View):
     def get(self,request):
@@ -227,16 +236,18 @@ class RemoveFriendView(LoginRequiredMixin,View):
         messages.info(request, f'{target.username} arkadaş listenden çıkarıldı.')
         return redirect('accounts:friend_list')
 
+class ProfileView(LoginRequiredMixin, View):
+    def get(self,request):
+        form = ProfileForm(instance=request.user)
+        return render(request, 'accounts/profile.html', {'form': form})
 
-@login_required
-def profile(request):
-    if request.method == 'POST':
+    def post(self,request):
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Profil güncellendi.')
             return redirect('accounts:profile')
-    else:
-        form = ProfileForm(instance=request.user)
 
-    return render(request, 'accounts/profile.html', {'form': form})
+        return render(request, 'accounts/profile.html', {'form': form})
+
+
