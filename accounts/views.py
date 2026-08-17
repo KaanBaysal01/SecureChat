@@ -9,6 +9,20 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 
 
+class PendingUserRequiredMixin:
+
+    def dispatch(self, request, *args, **kwargs):
+        user_id = request.session.get("pending_user_id")
+        if not user_id:
+            return redirect("accounts:register")
+
+        self.pending_user = User.objects.filter(id=user_id, is_active=False).first()
+        if not self.pending_user:
+            return redirect("accounts:register")
+
+        return super().dispatch(request, *args, **kwargs)
+
+
 class RegisterView(View):
     def get(self, request):
         form = RegisterForm()
@@ -29,22 +43,13 @@ class RegisterView(View):
         return render(request, "accounts/register.html", {"form": form})
 
 
-class VerifyView(View):
-    def dispatch(self, request, *args, **kwargs):
-        user_id = request.session.get("pending_user_id")
-        if not user_id:
-            return redirect("accounts:register")
-
-        self.user = User.objects.filter(id=user_id, is_active=False).first()
-        if not self.user:
-            return redirect("accounts:register")
-
-        return super().dispatch(request, *args, **kwargs)
-
+class VerifyView(PendingUserRequiredMixin, View):
     def get(self, request):
         form = VerificationForm()
         return render(
-            request, "accounts/verify.html", {"form": form, "email": self.user.email}
+            request,
+            "accounts/verify.html",
+            {"form": form, "email": self.pending_user.email},
         )
 
     def post(self, request):
@@ -54,7 +59,7 @@ class VerifyView(View):
             entered_code = form.cleaned_data["code"]
 
             code_obj = (
-                VerificationCode.objects.filter(user=self.user, is_used=False)
+                VerificationCode.objects.filter(user=self.pending_user, is_used=False)
                 .order_by("-created_at")
                 .first()
             )
@@ -69,11 +74,11 @@ class VerifyView(View):
                 code_obj.is_used = True
                 code_obj.save()
 
-                self.user.is_active = True
-                self.user.save()
+                self.pending_user.is_active = True
+                self.pending_user.save()
 
                 del request.session["pending_user_id"]
-                login(request, self.user)
+                login(request, self.pending_user)
                 messages.success(request, "Hesabınız doğrulandı.")
                 return redirect("/")
             else:
@@ -83,22 +88,18 @@ class VerifyView(View):
                 messages.error(request, f"Kod hatalı. Kalan deneme hakkı: {kalan}")
 
         return render(
-            request, "accounts/verify.html", {"form": form, "email": self.user.email}
+            request,
+            "accounts/verify.html",
+            {"form": form, "email": self.pending_user.email},
         )
 
 
-class ResendCodeView(View):
+class ResendCodeView(PendingUserRequiredMixin, View):
     def post(self, request):
-        user_id = request.session.get("pending_user_id")
-        if not user_id:
-            return redirect("accounts:register")
-
-        user = User.objects.filter(id=user_id, is_active=False).first()
-        if not user:
-            return redirect("accounts:register")
-
-        VerificationCode.objects.filter(user=user, is_used=False).update(is_used=True)
-        create_and_send_code(user)
+        VerificationCode.objects.filter(user=self.pending_user, is_used=False).update(
+            is_used=True
+        )
+        create_and_send_code(self.pending_user)
 
         messages.success(request, "Yeni kod gönderildi.")
         return redirect("accounts:verify")

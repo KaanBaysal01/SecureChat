@@ -71,7 +71,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.handle_mark_read(data)
         elif message_type == "delete_message":
             await self.handle_delete_message(data)
-        elif message_type == 'typing':
+        elif message_type == "typing":
             await self.handle_typing(data)
 
     async def handle_chat_message(self, data):
@@ -106,7 +106,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "sender_username": self.user.username,
             },
         )
-    
+
     async def handle_mark_read(self, data):
         message_id = data.get("message_id")
         if not message_id:
