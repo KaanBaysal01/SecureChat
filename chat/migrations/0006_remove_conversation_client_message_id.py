@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('chat', '0005_conversation_client_message_id_conversation_name'),
+        ("chat", "0005_conversation_client_message_id_conversation_name"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='conversation',
-            name='client_message_id',
+            model_name="conversation",
+            name="client_message_id",
         ),
     ]

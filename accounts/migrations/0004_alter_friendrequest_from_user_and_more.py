@@ -8,18 +8,26 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0003_friendrequest_friendrequest_unique_friend_request'),
+        ("accounts", "0003_friendrequest_friendrequest_unique_friend_request"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='friendrequest',
-            name='from_user',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sent_request', to=settings.AUTH_USER_MODEL),
+            model_name="friendrequest",
+            name="from_user",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="sent_request",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
         migrations.AlterField(
-            model_name='friendrequest',
-            name='to_user',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='received_request', to=settings.AUTH_USER_MODEL),
+            model_name="friendrequest",
+            name="to_user",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="received_request",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

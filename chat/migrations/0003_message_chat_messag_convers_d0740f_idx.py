@@ -6,12 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('chat', '0002_message_client_message_id_and_more'),
+        ("chat", "0002_message_client_message_id_and_more"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='message',
-            index=models.Index(fields=['conversation', '-created_at'], name='chat_messag_convers_d0740f_idx'),
+            model_name="message",
+            index=models.Index(
+                fields=["conversation", "-created_at"],
+                name="chat_messag_convers_d0740f_idx",
+            ),
         ),
     ]

@@ -35,7 +35,7 @@ class CryptoTest(TestCase):
 class MessageModelTest(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='test12345')
+        self.user = User.objects.create_user(username="testuser", password="test12345")
         self.conversation = Conversation.objects.create()
         self.conversation.participants.add(self.user)
 
@@ -48,4 +48,3 @@ class MessageModelTest(TestCase):
         )
         self.assertNotEqual(message.encrypted_content, plaintext)
         self.assertEqual(message.content, plaintext)
-

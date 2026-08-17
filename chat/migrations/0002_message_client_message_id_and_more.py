@@ -6,17 +6,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('chat', '0001_initial'),
+        ("chat", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='message',
-            name='client_message_id',
+            model_name="message",
+            name="client_message_id",
             field=models.CharField(blank=True, max_length=64, null=True),
         ),
         migrations.AddConstraint(
-            model_name='message',
-            constraint=models.UniqueConstraint(fields=('conversation', 'client_message_id'), name='unique_client_message_per_conversation'),
+            model_name="message",
+            constraint=models.UniqueConstraint(
+                fields=("conversation", "client_message_id"),
+                name="unique_client_message_per_conversation",
+            ),
         ),
     ]

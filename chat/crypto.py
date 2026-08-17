@@ -23,4 +23,3 @@ def decrypt_message(ciphertext: str) -> str:
         return get_fernet().decrypt(ciphertext.encode()).decode()
     except InvalidToken:
         return "[çözülemedi]"
-

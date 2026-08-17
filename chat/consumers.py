@@ -4,6 +4,7 @@ from channels.db import database_sync_to_async
 from .crypto import encrypt_message
 from .models import Conversation, Message, MessageReadStatus
 
+
 class ChatConsumer(AsyncWebsocketConsumer):
 
     MAX_MESSAGE_LENGTH = 4000
@@ -20,11 +21,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not await self.user_in_conversation():
             await self.close(code=4003)
             return
-        
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         await self.accept()
 
@@ -34,7 +32,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "type": "presence.update",
                 "username": self.user.username,
                 "status": "online",
-            }
+            },
         )
 
         await self.channel_layer.group_send(
@@ -42,7 +40,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             {
                 "type": "presence.query",
                 "reply_to": self.channel_name,
-            }
+            },
         )
 
     async def disconnect(self, close_code):
@@ -53,11 +51,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "type": "presence.update",
                     "username": self.user.username,
                     "status": "offline",
-                }
+                },
             )
             await self.channel_layer.group_discard(
-                self.room_group_name,
-                self.channel_name
+                self.room_group_name, self.channel_name
             )
 
     async def receive(self, text_data):
@@ -82,10 +79,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         if len(message) > self.MAX_MESSAGE_LENGTH:
-            await self.send(text_data=json.dumps({
-                "type": "error",
-                "detail": "Mesaj çok uzun.",
-            }))
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "error",
+                        "detail": "Mesaj çok uzun.",
+                    }
+                )
+            )
             return
 
         client_message_id = data.get("client_message_id")
@@ -101,7 +102,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "message_id": message_obj.id,
                 "message": message,
                 "sender_username": self.user.username,
-            }
+            },
         )
 
     async def handle_mark_read(self, data):
@@ -121,9 +122,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "message_id": message_id,
                 "read_by": self.user.username,
                 "read_count": read_count,
-                            }
+            },
         )
-    
+
     async def handle_delete_message(self, data):
         message_id = data.get("message_id")
         if not message_id:
@@ -138,37 +139,53 @@ class ChatConsumer(AsyncWebsocketConsumer):
             {
                 "type": "message_deleted",
                 "message_id": message_id,
-            }
+            },
         )
 
     async def chat_message(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "chat_message",
-            "message_id": event["message_id"],
-            "message": event["message"],
-            "sender_username": event["sender_username"],
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "chat_message",
+                    "message_id": event["message_id"],
+                    "message": event["message"],
+                    "sender_username": event["sender_username"],
+                }
+            )
+        )
 
     async def read_receipt(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "read_receipt",
-            "message_id": event["message_id"],
-            "read_by": event["read_by"],
-            "read_count":event["read_count"]
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "read_receipt",
+                    "message_id": event["message_id"],
+                    "read_by": event["read_by"],
+                    "read_count": event["read_count"],
+                }
+            )
+        )
 
     async def message_deleted(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "message_deleted",
-            "message_id": event["message_id"],
-        }))
-    
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_deleted",
+                    "message_id": event["message_id"],
+                }
+            )
+        )
+
     async def presence_update(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "presence",
-            "username": event["username"],
-            "status": event["status"],
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "presence",
+                    "username": event["username"],
+                    "status": event["status"],
+                }
+            )
+        )
 
     async def presence_query(self, event):
         if event["reply_to"] == self.channel_name:
@@ -180,7 +197,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "type": "presence.update",
                 "username": self.user.username,
                 "status": "online",
-            }
+            },
         )
 
     @database_sync_to_async
@@ -214,19 +231,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if message.sender_id == self.user.id:
             return False
-        
+
         status, created = MessageReadStatus.objects.get_or_create(
             message=message,
             user=self.user,
         )
 
         return created
-         
+
     @database_sync_to_async
-    def get_read_count(self,message_id):
-        return MessageReadStatus.objects.filter(
-            message__id = message_id
-        ).count()
+    def get_read_count(self, message_id):
+        return MessageReadStatus.objects.filter(message__id=message_id).count()
 
     @database_sync_to_async
     def delete_message(self, message_id):
@@ -237,5 +252,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).delete()
 
         return deleted_count > 0
-
-    
