@@ -7,6 +7,30 @@ from django.utils import timezone
 
 class User(AbstractUser):
     profile_photo = models.ImageField(upload_to="profiles/", null=True, blank=True)
+    last_seen = models.DateTimeField(null=True, blank=True)
+    show_last_seen = models.BooleanField(default=True, verbose_name="Son görülme ve çevrimiçi durumumu göster",)
+
+    def get_friends(self):
+        sent = FriendRequest.objects.filter(
+            from_user = self, status = "accepted"
+        ).values_list("to_user_id",flat=True)
+
+        received = FriendRequest.objects.filter(
+            to_user = self, status = "accepted"
+        ).values_list("from_user_id",flat=True)
+
+        return User.objects.filter(id__in=set(sent) | set(received) )
+
+    def get_related_ids(self):
+        sent = FriendRequest.objects.filter(
+            from_user=self, status__in=["pending", "accepted"]
+        ).values_list("to_user_id", flat=True)
+
+        received = FriendRequest.objects.filter(
+            to_user=self, status__in=["pending", "accepted"]
+        ).values_list("from_user_id", flat=True)
+
+        return set(sent) | set(received)
 
     def __str__(self):
         return self.username
@@ -61,3 +85,29 @@ class FriendRequest(models.Model):
 
     def __str__(self):
         return f"{self.from_user} → {self.to_user} ({self.status})"
+
+class LoginAttempt(models.Model):
+    username = models.CharField(max_length=150)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    MAX_ATTEMPTS = 5
+    WINDOW_MINUTES = 15
+
+    @classmethod
+    def is_locked(cls, username):
+        window_start = timezone.now() - timedelta(minutes=cls.WINDOW_MINUTES)
+        return cls.objects.filter(
+            username__iexact=username,
+            created_at__gte=window_start,
+        ).count() >= cls.MAX_ATTEMPTS
+
+    @classmethod
+    def record_failure(cls, username):
+        cls.objects.create(username=username)
+
+    @classmethod
+    def clear(cls, username):
+        cls.objects.filter(username__iexact=username).delete()
+
+    def __str__(self):
+        return f"{self.username} — {self.created_at}"

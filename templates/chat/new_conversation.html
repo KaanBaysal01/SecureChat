@@ -2,23 +2,107 @@
 {% block title %}Yeni sohbet{% endblock %}
 
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-body">
-        <h4 class="card-title mb-3">Yeni sohbet</h4>
-
-        <form method="post">
-            {% csrf_token %}
-            {% for field in form %}
-                <div class="mb-3">
-                    <label class="form-label">{{ field.label }}</label>
-                    {{ field }}
-                    {% for error in field.errors %}
-                        <div class="text-danger small mt-1">{{ error }}</div>
-                    {% endfor %}
-                </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-primary">Oluştur</button>
-        </form>
-    </div>
+<div class="d-flex align-items-center gap-3 mb-3">
+    <a href="{% url 'chat:conversation_list' %}" class="text-decoration-none text-muted fs-4">&lsaquo;</a>
+    <h1 class="page-title">Yeni sohbet</h1>
 </div>
+
+<form method="post" id="new-conv-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Kişi seç</strong>
+            <span id="sel-count" class="badge rounded-pill bg-secondary">0 seçili</span>
+        </div>
+
+        <div class="card-body border-bottom py-2">
+            <input type="text" id="user-filter" class="form-control form-control-sm"
+                   placeholder="Kişi ara..." autocomplete="off">
+        </div>
+
+        <div class="list-group list-group-flush" id="user-list" style="max-height: 340px; overflow-y: auto;">
+            {% for u in users %}
+                <label class="list-group-item d-flex align-items-center gap-3 py-2 user-row" style="cursor: pointer;"
+                       data-username="{{ u.username|lower }}">
+                    <input class="form-check-input m-0 user-cb" type="checkbox"
+                           name="participants" value="{{ u.id }}">
+
+                    {% if u.profile_photo %}
+                        <img src="{{ u.profile_photo.url }}" alt="" class="avatar rounded-circle"
+                             style="width: 36px; height: 36px;">
+                    {% else %}
+                        <span class="rounded-circle bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                              style="width: 36px; height: 36px; font-weight: 600;">{{ u.username|first|upper }}</span>
+                    {% endif %}
+
+                    <span class="fw-semibold">{{ u.username }}</span>
+                </label>
+            {% empty %}
+                <div class="list-group-item text-muted text-center py-4">Başka kullanıcı yok.</div>
+            {% endfor %}
+
+            <div class="list-group-item text-muted text-center py-4 d-none" id="no-result">
+                Sonuç bulunamadı.
+            </div>
+        </div>
+
+        {% if form.participants.errors %}
+            <div class="card-footer text-danger small">{{ form.participants.errors|join:", " }}</div>
+        {% endif %}
+    </div>
+
+    <div class="card shadow-sm mb-3 d-none" id="group-name-card">
+        <div class="card-body">
+            <label class="form-label fw-semibold">Grup adı</label>
+            <input type="text" name="name" maxlength="100" class="form-control"
+                   placeholder="Örn. Proje Ekibi" value="{{ form.name.value|default_if_none:'' }}">
+            <div class="form-text">Birden fazla kişi seçtiğin için grup sohbeti oluşturulacak.</div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="submit-btn" disabled>Sohbeti başlat</button>
+</form>
+
+<script>
+    const filterInput = document.getElementById('user-filter');
+    const rows = Array.from(document.querySelectorAll('.user-row'));
+    const boxes = Array.from(document.querySelectorAll('.user-cb'));
+    const countEl = document.getElementById('sel-count');
+    const groupCard = document.getElementById('group-name-card');
+    const submitBtn = document.getElementById('submit-btn');
+    const noResult = document.getElementById('no-result');
+
+    function refresh() {
+        const selected = boxes.filter(b => b.checked).length;
+
+        countEl.textContent = selected + ' seçili';
+        countEl.className = 'badge rounded-pill ' + (selected ? 'bg-primary' : 'bg-secondary');
+
+        groupCard.classList.toggle('d-none', selected < 2);
+        submitBtn.disabled = selected === 0;
+        submitBtn.textContent = selected > 1 ? 'Grubu oluştur' : 'Sohbeti başlat';
+    }
+
+    boxes.forEach(b => b.addEventListener('change', refresh));
+
+    filterInput.addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        let visible = 0;
+
+        rows.forEach(r => {
+            const match = r.dataset.username.includes(q);
+            r.classList.toggle('d-none', !match);
+            if (match) visible++;
+        });
+
+        noResult.classList.toggle('d-none', visible > 0);
+    });
+
+    refresh();
+</script>
 {% endblock %}

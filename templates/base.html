@@ -22,6 +22,9 @@
         .date-divider {
             text-align: center;
             margin: 14px 0 10px;
+            position: sticky;
+            top: 0;
+            z-index: 2;
         }
         .date-divider span {
             background: #e9edf3;
@@ -33,6 +36,39 @@
         .min-width-0 {
             min-width: 0;
         }
+        #chat-log .bg-primary a {
+            color: #ffffff;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        #chat-log .bg-white a {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        #chat-log .grouped {
+            margin-top: -6px;
+        }
+        #chat-log .grouped.justify-content-end > div {
+            border-top-right-radius: 6px;
+        }
+        #chat-log .grouped:not(.justify-content-end) > div {
+            border-top-left-radius: 6px;
+        }
+        #chat-log .grouped-prev.justify-content-end > div {
+            border-bottom-right-radius: 6px;
+        }
+        #chat-log .grouped-prev:not(.justify-content-end) > div {
+            border-bottom-left-radius: 6px;
+        }
+        #chat-log .pin-btn,
+        #chat-log .delete-btn {
+            opacity: 0.55;
+            transition: opacity 0.12s ease;
+        }
+        #chat-log [id^="msg-"]:hover .pin-btn,
+        #chat-log [id^="msg-"]:hover .delete-btn {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -42,10 +78,16 @@
         <a class="navbar-brand fw-semibold text-primary" href="/">SecureChat</a>
         <div class="ms-auto d-flex align-items-center gap-1">
             {% if user.is_authenticated %}
-                <a class="nav-link px-2" href="{% url 'chat:conversation_list' %}">Sohbetler</a>
-                <a class="nav-link px-2" href="{% url 'accounts:friend_list' %}">Arkadaşlar</a>
-                <a class="nav-link px-2" href="{% url 'accounts:friend_requests' %}">İstekler</a>
-                <a class="nav-link px-2" href="{% url 'accounts:user_list' %}">Keşfet</a>
+                {% with url_name=request.resolver_match.url_name %}
+                    <a class="nav-link px-2 {% if url_name == 'conversation_list' %}fw-semibold text-primary{% endif %}"
+                       href="{% url 'chat:conversation_list' %}">Sohbetler</a>
+                    <a class="nav-link px-2 {% if url_name == 'friend_list' %}fw-semibold text-primary{% endif %}"
+                       href="{% url 'accounts:friend_list' %}">Arkadaşlar</a>
+                    <a class="nav-link px-2 {% if url_name == 'friend_requests' %}fw-semibold text-primary{% endif %}"
+                       href="{% url 'accounts:friend_requests' %}">İstekler</a>
+                    <a class="nav-link px-2 {% if url_name == 'user_list' %}fw-semibold text-primary{% endif %}"
+                       href="{% url 'accounts:user_list' %}">Keşfet</a>
+                {% endwith %}
 
                 <a href="{% url 'accounts:profile' %}" class="d-flex align-items-center gap-2 ms-2 text-decoration-none">
                     {% if user.profile_photo %}

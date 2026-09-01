@@ -3,7 +3,10 @@ import json
 from channels.db import database_sync_to_async
 from .crypto import encrypt_message
 from .models import Conversation, Message, MessageReadStatus
+from django.utils import timezone
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 class ChatConsumer(AsyncWebsocketConsumer):
 
@@ -26,14 +29,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "presence.update",
-                "username": self.user.username,
-                "status": "online",
-            },
-        )
+        if self.user.show_last_seen:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "presence.update",
+                    "username": self.user.username,
+                    "status": "online",
+                },
+            )
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -45,14 +49,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         if hasattr(self, "room_group_name"):
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    "type": "presence.update",
-                    "username": self.user.username,
-                    "status": "offline",
-                },
-            )
+            await self.update_last_seen()
+
+            if self.user.show_last_seen:
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        "type": "presence.update",
+                        "username": self.user.username,
+                        "status": "offline",
+                    },
+                )
+
             await self.channel_layer.group_discard(
                 self.room_group_name, self.channel_name
             )
@@ -73,6 +81,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.handle_delete_message(data)
         elif message_type == "typing":
             await self.handle_typing(data)
+        elif message_type == "pin_message":
+            await self.handle_pin_message(data)
+        elif message_type == "unpin_message":
+            await self.handle_unpin_message(data)
+    
 
     async def handle_chat_message(self, data):
         message = (data.get("message") or "").strip()
@@ -154,6 +167,42 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
+        
+    async def handle_pin_message(self, data):
+        message_id = data.get("message_id")
+        if not message_id:
+            return
+
+        pinned = await self.pin_message(message_id)
+        if pinned is None:
+            return
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "pin.update",
+                "message_id": pinned["message_id"],
+                "preview": pinned["preview"],
+                "sender_username": pinned["sender_username"],
+                "pinned_by":pinned["pinned_by"],
+            },
+        )
+
+    async def handle_unpin_message(self, data):
+        if not await self.unpin_message():
+            return
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "pin.update",
+                "message_id": None,
+                "preview": None,
+                "sender_username": None,
+                "pinned_by": None,
+            },
+        )
+
     async def chat_message(self, event):
         await self.send(
             text_data=json.dumps(
@@ -162,9 +211,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "message_id": event["message_id"],
                     "message": event["message"],
                     "sender_username": event["sender_username"],
-                }
+                    "file_url": event.get("file_url"),
+                    "file_name": event.get("file_name"),
+                    "file_size_display": event.get("file_size_display"),
+                    "is_image": event.get("is_image", False),
+                    "is_system": event.get("is_system",False),
+                    }
+                )
             )
-        )
 
     async def read_receipt(self, event):
         await self.send(
@@ -210,8 +264,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def pin_update(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "pin_update",
+                    "message_id": event["message_id"],
+                    "preview": event["preview"],
+                    "sender_username": event["sender_username"],
+                    "pinned_by": event["pinned_by"],
+                }
+            )
+        )
+
     async def presence_query(self, event):
-        if event["reply_to"] == self.channel_name:
+        if event["reply_to"] == self.channel_name or not self.user.show_last_seen:
             return
 
         await self.channel_layer.send(
@@ -275,3 +342,56 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).delete()
 
         return deleted_count > 0
+
+    @database_sync_to_async
+    def update_last_seen(self):
+        User.objects.filter(id=self.user.id).update(last_seen=timezone.now())
+
+    
+    def _conversation_if_participant(self):
+        return Conversation.objects.filter(
+            id=self.conversation_id,
+            participants=self.user,
+        ).first()
+
+    @database_sync_to_async
+    def pin_message(self, message_id):
+        conversation = self._conversation_if_participant()
+        if conversation is None:
+            return None
+
+        message = (
+            Message.objects.filter(id=message_id, conversation=conversation)
+            .select_related("sender")
+            .first()
+        )
+
+        if message is None:
+            return None
+
+        conversation.pinned_message = message
+        conversation.pinned_by = self.user
+        conversation.save(update_fields=["pinned_message","pinned_by"])
+
+        preview = message.file_name if message.has_file else message.content[:80]
+
+        return {
+            "message_id": message.id,
+            "preview": preview,
+            "sender_username": message.sender.username,
+            "pinned_by": self.user.username,
+        }
+
+    @database_sync_to_async
+    def unpin_message(self):
+        conversation = self._conversation_if_participant()
+        if conversation is None:
+            return False
+
+        if not conversation.can_unpin(self.user):
+            return False
+
+        conversation.pinned_message = None
+        conversation.pinned_by = None
+        conversation.save(update_fields=["pinned_message", "pinned_by"])
+        return True

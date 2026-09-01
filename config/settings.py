@@ -166,3 +166,6 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@securechat.local")
 
 LOGIN_URL = "/accounts/login/"
+SECURE_FILE_ROOT = BASE_DIR / "secure_files"
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024
+USER_STORAGE_QUOTA = 500 * 1024 * 1024

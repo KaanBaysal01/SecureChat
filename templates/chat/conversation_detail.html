@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% load chat_extras %}
+
 {% block title %}Sohbet{% endblock %}
 
 {% block content %}
@@ -21,26 +23,77 @@
 
         <div class="flex-grow-1 min-width-0">
             <div class="fw-semibold text-truncate">{{ title }}</div>
-            <div id="online-users" class="small text-muted"></div>
+            <div id="online-users" class="small text-muted">
+                {% if not conversation.is_group and others.0.show_last_seen and others.0.last_seen %}
+                    son görülme {{ others.0.last_seen|timesince }} önce
+                {% endif %}
+            </div>
             {% if subtitle %}<div class="small text-muted text-truncate">{{ subtitle }}</div>{% endif %}
         </div>
-    </div>
 
-    <div id="chat-log" class="card-body" style="height: 460px; overflow-y: auto; background: #f4f5f7;">
+        {% if conversation.is_group %}
+            <a href="{% url 'chat:group_settings' conversation.id %}"
+               class="btn btn-sm btn-outline-secondary flex-shrink-0">Ayarlar</a>
+        {% else %}
+            <form method="post" action="{% url 'chat:delete_conversation' conversation.id %}"
+                  class="m-0 flex-shrink-0"
+                  onsubmit="return confirm('Bu sohbet ve tüm mesajlar silinecek. Emin misin?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">Sil</button>
+            </form>
+        {% endif %}
+    </div>
+<div id="pin-bar"
+    class="px-3 py-2 border-bottom bg-warning-subtle align-items-center gap-2 {% if conversation.pinned_message %}d-flex{% else %}d-none{% endif %}">
+   <div class="flex-grow-1 min-width-0">
+       <div class="small text-muted">Sabitlenmiş mesaj</div>
+       <div id="pin-preview" class="small text-truncate">
+           {% if conversation.pinned_message %}{{ conversation.pinned_message.sender.username }}: {% if conversation.pinned_message.has_file %}{{ conversation.pinned_message.file_name }}{% else %}{{ conversation.pinned_message.content|truncatechars:80 }}{% endif %}{% endif %}
+       </div>
+   </div>
+   <button id="unpin-btn" type="button"
+           class="btn btn-sm btn-link text-muted p-0 {% if not can_unpin %}d-none{% endif %}"
+           style="font-size: 12px;">kaldır</button>
+</div>
+    <div id="chat-log" class="card-body" style="height: calc(100vh - 340px); min-height: 320px; overflow-y: auto; background: #f4f5f7;">
         {% for message in chat_messages %}
             {% ifchanged message.created_at|date:"Y-m-d" %}
                 <div class="date-divider"><span>{{ message.created_at|date:"d F Y" }}</span></div>
             {% endifchanged %}
+            {% if message.is_system %}
+            <div id="msg-{{ message.id }}" class="text-center my-2">
+                <span class="badge rounded-pill bg-light text-muted fw-normal small px-3 py-2">
+                    {{ message.content }}
+                </span>
+            </div>
+        {% else %}
             <div id="msg-{{ message.id }}" data-sender="{{ message.sender.username }}"
                  class="d-flex mb-2 {% if message.sender == user %}justify-content-end{% endif %}">
                 <div class="px-3 py-2 rounded-4 shadow-sm {% if message.sender == user %}bg-primary text-white{% else %}bg-white border{% endif %}"
                      style="max-width: 75%;">
                     {% if message.sender != user %}
-                        <div class="small fw-semibold text-primary-emphasis mb-1">{{ message.sender.username }}</div>
+                        {% ifchanged message.sender.username %}
+                            <div class="small fw-semibold text-primary-emphasis mb-1">{{ message.sender.username }}</div>
+                        {% endifchanged %}
                     {% endif %}
-                    {{ message.content }}
+                    {% if message.has_file %}
+                    {% if message.is_image %}
+                <img src="{% url 'chat:file' message.id %}"
+                    data-name="{{ message.file_name }}"
+                    class="preview-img rounded-3 d-block"
+                    style="max-width: 100%; max-height: 260px; cursor: zoom-in;">
+                    {% else %}
+                        <a href="{% url 'chat:file' message.id %}"
+                           class="d-block text-decoration-none {% if message.sender == user %}text-white{% else %}text-body{% endif %}">
+                            <div class="fw-semibold text-truncate">{{ message.file_name }}</div>
+                            <div class="small opacity-75">{{ message.file_size|filesizeformat }}</div>
+                        </a>
+                    {% endif %}
+                {% endif %}
+                {% if message.content %}<div>{{ message.content|linkify }}</div>{% endif %}
                     <div class="small text-end {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}">
                         {{ message.created_at|date:"H:i" }}
+                        <button type="button" class="pin-btn btn btn-sm btn-link p-0 ms-2 {% if message.sender == user %}text-white-50{% else %}text-muted{% endif %}" style="font-size: 11px;">sabitle</button>
                         {% if message.sender == user %}
                             <span class="read-mark">{% if message.read_count > 1 %}{{ message.read_count }} kişi okudu{% elif message.read_count == 1 %}okundu{% endif %}</span>
                             <button type="button" class="delete-btn btn btn-sm btn-link text-white-50 p-0 ms-2" style="font-size: 11px;">sil</button>
@@ -48,23 +101,47 @@
                     </div>
                 </div>
             </div>
+        {% endif %}
         {% empty %}
             <div class="text-center text-muted py-5">Henüz mesaj yok. İlk mesajı sen gönder.</div>
         {% endfor %}
     </div>
 
+    <button id="scroll-bottom" type="button"
+            class="btn btn-sm btn-light shadow rounded-pill d-none"
+            style="position: absolute; right: 20px; bottom: 108px; z-index: 3;">↓ en alta in</button>
+
     <div class="card-footer bg-white">
         <div class="input-group">
-            <input type="text" id="chat-input" class="form-control rounded-start-pill" placeholder="Mesaj yaz..." autofocus>
+            <button id="attach-btn" type="button" class="btn btn-outline-secondary rounded-start-pill px-3">Dosya</button>
+            <input type="text" id="chat-input" class="form-control" placeholder="Mesaj yaz..." autofocus>
             <button id="chat-send" class="btn btn-primary rounded-end-pill px-4">Gönder</button>
         </div>
+        <input type="file" id="file-input" class="d-none">
         <div id="typing-indicator" class="small text-muted" style="height: 18px;"></div>
         <div id="chat-status" class="small text-muted mt-2">bağlanıyor...</div>
     </div>
 </div>
 
+<div class="modal fade" id="image-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center">
+                <img id="image-modal-img" src="" alt="" class="img-fluid rounded-3">
+            </div>
+            <div class="modal-footer border-0 justify-content-center gap-2">
+                <a id="image-modal-download" href="#" download class="btn btn-sm btn-light">İndir</a>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{ conversation.id|json_script:"conversation-id" }}
 {{ user.username|json_script:"current-username" }}
+{{ csrf_token|stringformat:"s"|json_script:"csrf-token" }}
+{{ is_admin|json_script:"is-admin" }}
+{{ conversation.pinned_message_id|json_script:"pinned-message-id" }}
 
 <script>
     const conversationId = JSON.parse(document.getElementById('conversation-id').textContent);
@@ -76,6 +153,42 @@
     const onlineUsers = new Set();
     const typingEl = document.getElementById('typing-indicator');
     const typingUsers = new Set();
+    const pinBar = document.getElementById('pin-bar');
+    const pinPreview = document.getElementById('pin-preview');
+    const unpinBtn = document.getElementById('unpin-btn');
+    const currentUserIsAdmin = JSON.parse(document.getElementById('is-admin').textContent);
+    let pinnedMessageId = JSON.parse(document.getElementById('pinned-message-id').textContent);
+    const imageModalEl = document.getElementById('image-modal');
+    const modalImg = document.getElementById('image-modal-img');
+    const modalDownload = document.getElementById('image-modal-download');
+
+    function linkifyToFragment(text) {
+        const urlRegex = /(https?:\/\/[^\s<>"']+)/g;
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+        let match;
+
+        while ((match = urlRegex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+            }
+
+            const a = document.createElement('a');
+            a.href = match[0];
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = match[0];
+            fragment.appendChild(a);
+
+            lastIndex = match.index + match[0].length;
+        }
+
+        if (lastIndex < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+
+        return fragment;
+    }
 
     function renderTyping() {
         if (typingUsers.size === 0) {
@@ -89,13 +202,64 @@
 
     function renderOnline() {
         if (onlineUsers.size === 0) {
-            onlineEl.textContent = 'karşı taraf çevrimdışı';
+            onlineEl.textContent = 'az önce görüldü';
         } else {
             onlineEl.textContent = 'çevrimiçi: ' + Array.from(onlineUsers).join(', ');
         }
     }
-    renderOnline();
+
+    function renderPin(data) {
+        pinnedMessageId = data.message_id;
+
+        if (!data.message_id) {
+            pinBar.classList.remove('d-flex');
+            pinBar.classList.add('d-none');
+            return;
+        }
+
+        pinPreview.textContent = data.sender_username + ': ' + (data.preview || '');
+        pinBar.classList.remove('d-none');
+        pinBar.classList.add('d-flex');
+
+        unpinBtn.classList.toggle(
+            'd-none',
+            !(data.pinned_by === currentUsername || currentUserIsAdmin)
+        );
+    }
     
+    
+    function isAtBottom() {
+        return log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+    }
+
+    function scrollIfSticky(wasAtBottom) {
+        if (wasAtBottom) {
+            log.scrollTop = log.scrollHeight;
+        }
+    }
+
+    function markGrouping(el) {
+        const prev = el.previousElementSibling;
+        if (!prev || !prev.dataset.sender || !el.dataset.sender) return;
+
+        if (prev.dataset.sender === el.dataset.sender) {
+            el.classList.add('grouped');
+            prev.classList.add('grouped-prev');
+        }
+    }
+
+    log.querySelectorAll('[id^="msg-"]').forEach(markGrouping);
+
+    const scrollBtn = document.getElementById('scroll-bottom');
+
+    log.addEventListener('scroll', function () {
+        scrollBtn.classList.toggle('d-none', isAtBottom());
+    });
+
+    scrollBtn.addEventListener('click', function () {
+        log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' });
+    });
+
     log.scrollTop = log.scrollHeight;
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -122,6 +286,24 @@
         const data = JSON.parse(e.data);
 
         if (data.type === 'chat_message') {
+            const wasAtBottom = isAtBottom();
+
+            if (data.is_system) {
+                const sysWrapper = document.createElement('div');
+                sysWrapper.id = 'msg-' + data.message_id;
+                sysWrapper.className = 'text-center my-2';
+
+                const badge = document.createElement('span');
+                badge.className = 'badge rounded-pill bg-light text-muted fw-normal small px-3 py-2';
+                badge.textContent = data.message;
+
+                sysWrapper.appendChild(badge);
+                log.appendChild(sysWrapper);
+                scrollIfSticky(wasAtBottom);
+                return;
+            }
+
+            
             const isMine = data.sender_username === currentUsername;
 
             const wrapper = document.createElement('div');
@@ -140,10 +322,47 @@
                 bubble.appendChild(name);
             }
 
-            bubble.appendChild(document.createTextNode(data.message));
+            if (data.file_url) {
+                if (data.is_image) {
+                    const img = document.createElement('img');
+                    img.src = data.file_url;
+                    img.dataset.name = data.file_name;
+                    img.className = 'preview-img rounded-3 d-block';
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '260px';
+                    img.style.cursor = 'zoom-in';
+                    bubble.appendChild(img);
+                } else {
+                    const link = document.createElement('a');
+                    link.href = data.file_url;
+                    link.className = 'd-block text-decoration-none ' + (isMine ? 'text-white' : 'text-body');
+
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'fw-semibold text-truncate';
+                    nameEl.textContent = data.file_name;
+
+                    const sizeEl = document.createElement('div');
+                    sizeEl.className = 'small opacity-75';
+                    sizeEl.textContent = data.file_size_display;
+
+                    link.appendChild(nameEl);
+                    link.appendChild(sizeEl);
+                    bubble.appendChild(link);
+                }
+            }
+
+            if (data.message) {
+                bubble.appendChild(linkifyToFragment(data.message));
+            }
 
             const meta = document.createElement('div');
             meta.className = 'small text-end ' + (isMine ? 'text-white-50' : 'text-muted');
+            const pinBtn = document.createElement('button');
+            pinBtn.type = 'button';
+            pinBtn.className = 'pin-btn btn btn-sm btn-link p-0 ms-2 ' + (isMine ? 'text-white-50' : 'text-muted');
+            pinBtn.style.fontSize = '11px';
+            pinBtn.textContent = 'sabitle';
+            meta.appendChild(pinBtn);
 
             if (isMine) {
                 const mark = document.createElement('span');
@@ -166,7 +385,8 @@
             bubble.appendChild(meta);
             wrapper.appendChild(bubble);
             log.appendChild(wrapper);
-            log.scrollTop = log.scrollHeight;
+            markGrouping(wrapper);
+            scrollIfSticky(wasAtBottom);
 
         } else if (data.type === 'read_receipt') {
             const p = document.getElementById('msg-' + data.message_id);
@@ -177,6 +397,10 @@
         } else if (data.type === 'message_deleted') {
             const el = document.getElementById('msg-' + data.message_id);
             if (el) el.remove();
+
+            if (pinnedMessageId === data.message_id) {
+                renderPin({ message_id: null });
+            }
         } else if (data.type === 'presence') {
             if (data.username !== currentUsername) {
                 if (data.status === 'online') {
@@ -197,9 +421,48 @@
                 }
                 renderTyping();
             }
+        } else if (data.type === 'pin_update') {
+            renderPin(data);
         }
         
     };
+
+    const csrfToken = JSON.parse(document.getElementById('csrf-token').textContent);
+    const uploadUrl = "{% url 'chat:upload' conversation.id %}";
+    const attachBtn = document.getElementById('attach-btn');
+    const fileInput = document.getElementById('file-input');
+
+    attachBtn.addEventListener('click', function () {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const body = new FormData();
+        body.append('file', file);
+
+        attachBtn.disabled = true;
+        statusEl.textContent = 'yükleniyor...';
+
+        fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            body: body
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                statusEl.textContent = data.error ? data.error : 'bağlı';
+            })
+            .catch(function () {
+                statusEl.textContent = 'yükleme başarısız';
+            })
+            .finally(function () {
+                attachBtn.disabled = false;
+                fileInput.value = '';
+            });
+    });
 
     function sendMessage() {
         const content = input.value.trim();
@@ -241,6 +504,25 @@
     });
 
     log.addEventListener('click', function (e) {
+        const previewImg = e.target.closest('.preview-img');
+        if (previewImg) {
+            modalImg.src = previewImg.src;
+            modalDownload.href = previewImg.src;
+            modalDownload.download = previewImg.dataset.name || 'dosya';
+            bootstrap.Modal.getOrCreateInstance(imageModalEl).show();
+            return;
+        }
+        const pinBtn = e.target.closest('.pin-btn');
+        if (pinBtn) {
+            const w = pinBtn.closest('[id^="msg-"]');
+            if (w) {
+                socket.send(JSON.stringify({
+                    type: 'pin_message',
+                    message_id: parseInt(w.id.replace('msg-', ''), 10)
+                }));
+            }
+            return;
+        }
         const btn = e.target.closest('.delete-btn');
         if (!btn) return;
 
@@ -252,6 +534,9 @@
             type: 'delete_message',
             message_id: messageId
         }));
+    });
+    unpinBtn.addEventListener('click', function () {
+        socket.send(JSON.stringify({ type: 'unpin_message' }));
     });
 </script>
 {% endblock %}

@@ -2,19 +2,43 @@
 {% block title %}Arkadaşlarım{% endblock %}
 
 {% block content %}
+<h1 class="page-title mb-3">Arkadaşlarım</h1>
+
 <div class="card shadow-sm">
-    <div class="card-header"><strong>Arkadaşlarım</strong></div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Arkadaş listesi</strong>
+        <span class="badge rounded-pill bg-secondary">{{ friends|length }} kişi</span>
+    </div>
+
     <div class="list-group list-group-flush">
         {% for f in friends %}
-        <div class="list-group-item d-flex justify-content-between align-items-center">
-            <span>{{ f.username }}</span>
-            <form method="post" action="{% url 'accounts:remove_friend' f.id %}" class="m-0">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-danger">Çıkar</button>
-            </form>
-        </div>
+            <div class="list-group-item d-flex align-items-center gap-3 py-3">
+                {% if f.profile_photo %}
+                    <img src="{{ f.profile_photo.url }}" alt="" class="avatar rounded-circle"
+                         style="width: 44px; height: 44px;">
+                {% else %}
+                    <span class="rounded-circle bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                          style="width: 44px; height: 44px; font-weight: 600;">{{ f.username|first|upper }}</span>
+                {% endif %}
+
+                <div class="flex-grow-1 min-width-0">
+                    <div class="fw-semibold text-truncate">{{ f.username }}</div>
+                    {% if f.show_last_seen and f.last_seen %}
+                        <div class="small text-muted">son görülme {{ f.last_seen|timesince }} önce</div>
+                    {% endif %}
+                </div>
+
+                <form method="post" action="{% url 'accounts:remove_friend' f.id %}" class="m-0 flex-shrink-0"
+                      onsubmit="return confirm('{{ f.username }} arkadaş listenden çıkarılacak. Emin misin?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Çıkar</button>
+                </form>
+            </div>
         {% empty %}
-            <div class="list-group-item text-muted">Henüz arkadaşın yok.</div>
+            <div class="list-group-item text-center text-muted py-5">
+                <div class="mb-2">Henüz arkadaşın yok.</div>
+                <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-primary">Kullanıcıları keşfet</a>
+            </div>
         {% endfor %}
     </div>
 </div>

@@ -12,10 +12,7 @@ urlpatterns = [
     path("profile/", views.ProfileView.as_view(), name="profile"),
     path(
         "login/",
-        auth_views.LoginView.as_view(
-            template_name="accounts/login.html",
-            authentication_form=BootstrapAuthenticationForm,
-        ),
+        views.RateLimitedLoginView.as_view(),
         name="login",
     ),
     path("users/", views.UserListView.as_view(), name="user_list"),

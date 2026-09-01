@@ -2,11 +2,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .models import User, VerificationCode, FriendRequest
 from django.contrib.auth import login
 from django.contrib import messages
-from .forms import RegisterForm, VerificationForm, ProfileForm
+from .forms import RegisterForm, VerificationForm, ProfileForm, BootstrapAuthenticationForm
 from .utils import create_and_send_code
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.contrib.auth.views import LoginView
+from .models import LoginAttempt
 
 
 class PendingUserRequiredMixin:
@@ -118,17 +121,9 @@ class UserListView(LoginRequiredMixin, View):
         paginator = Paginator(users, 10)
         page_obj = paginator.get_page(request.GET.get("page"))
 
-        sent_ids = FriendRequest.objects.filter(
-            from_user=request.user,
-            status__in=["pending", "accepted"],
-        ).values_list("to_user_id", flat=True)
+        related_ids = request.user.get_related_ids()
 
-        received_ids = FriendRequest.objects.filter(
-            to_user=request.user,
-            status__in=["pending", "accepted"],
-        ).values_list("from_user_id", flat=True)
-
-        related_ids = set(sent_ids) | set(received_ids)
+        friend_ids = set(request.user.get_friends().values_list("id", flat=True))
 
         return render(
             request,
@@ -137,11 +132,24 @@ class UserListView(LoginRequiredMixin, View):
                 "page_obj": page_obj,
                 "related_ids": related_ids,
                 "q": q,
+                "friend_ids": friend_ids,
             },
         )
 
 
 class SendFriendRequestView(LoginRequiredMixin, View):
+    def _safe_next(self, request):
+        next_url = request.POST.get("next")
+
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return next_url
+
+        return "accounts:user_list"
+
     def post(self, request, user_id):
         target = get_object_or_404(User, id=user_id)
 
@@ -169,7 +177,7 @@ class SendFriendRequestView(LoginRequiredMixin, View):
         else:
             messages.info(request, "Zaten istek göndermişsin.")
 
-        return redirect("accounts:user_list")
+        return redirect(self._safe_next(request))
 
 
 class FriendRequestView(LoginRequiredMixin, View):
@@ -229,29 +237,9 @@ class RejectFriendRequestView(LoginRequiredMixin, View):
 
 class FriendListView(LoginRequiredMixin, View):
     def get(self, request):
-        sent = FriendRequest.objects.filter(
-            from_user=request.user,
-            status="accepted",
-        ).select_related("to_user")
+        friends = request.user.get_friends().order_by("username")
 
-        received = FriendRequest.objects.filter(
-            to_user=request.user,
-            status="accepted",
-        ).select_related("from_user")
-
-        friends = []
-        for fr in sent:
-            friends.append(fr.to_user)
-        for fr in received:
-            friends.append(fr.from_user)
-
-        return render(
-            request,
-            "accounts/friend_list.html",
-            {
-                "friends": friends,
-            },
-        )
+        return render(request, "accounts/friend_list.html", {"friends": friends})
 
 
 class RemoveFriendView(LoginRequiredMixin, View):
@@ -288,3 +276,23 @@ class ProfileView(LoginRequiredMixin, View):
             return redirect("accounts:profile")
 
         return render(request, "accounts/profile.html", {"form": form})
+
+class RateLimitedLoginView(LoginView):
+    template_name = "accounts/login.html"
+    authentication_form = BootstrapAuthenticationForm
+
+    def form_valid(self, form):
+        username = form.cleaned_data.get("username", "")
+
+        if LoginAttempt.is_locked(username):
+            form.add_error(None, "Çok fazla hatalı deneme yapıldı. 15 dakika sonra tekrar dene.")
+            return self.render_to_response(self.get_context_data(form=form))
+
+        LoginAttempt.clear(username)
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        username = form.data.get("username", "")
+        if username:
+            LoginAttempt.record_failure(username)
+        return super().form_invalid(form)

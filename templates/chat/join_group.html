@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Gruba katıl{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+        <div class="rounded-circle bg-secondary-subtle text-secondary-emphasis d-inline-flex align-items-center justify-content-center mb-3"
+             style="width: 64px; height: 64px; font-size: 24px; font-weight: 600;">G</div>
+
+        <h1 class="page-title mb-2">{{ conversation.name|default:"Grup" }}</h1>
+        <p class="text-muted small mb-4">{{ conversation.participants.count }} katılımcı</p>
+
+        <form method="post" class="d-inline m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary px-4">Gruba katıl</button>
+        </form>
+        <a href="{% url 'chat:conversation_list' %}" class="btn btn-link text-muted">Vazgeç</a>
+    </div>
+</div>
+{% endblock %}

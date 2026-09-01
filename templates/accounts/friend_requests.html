@@ -2,13 +2,33 @@
 {% block title %}Arkadaşlık istekleri{% endblock %}
 
 {% block content %}
+<h1 class="page-title mb-3">Arkadaşlık istekleri</h1>
+
 <div class="card shadow-sm">
-    <div class="card-header"><strong>Gelen istekler</strong></div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Gelen istekler</strong>
+        {% if incoming %}
+            <span class="badge rounded-pill bg-primary">{{ incoming|length }}</span>
+        {% endif %}
+    </div>
+
     <div class="list-group list-group-flush">
         {% for req in incoming %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <span>{{ req.from_user.username }}</span>
-                <div class="d-flex gap-2">
+            <div class="list-group-item d-flex align-items-center gap-3 py-3">
+                {% if req.from_user.profile_photo %}
+                    <img src="{{ req.from_user.profile_photo.url }}" alt="" class="avatar rounded-circle"
+                         style="width: 44px; height: 44px;">
+                {% else %}
+                    <span class="rounded-circle bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                          style="width: 44px; height: 44px; font-weight: 600;">{{ req.from_user.username|first|upper }}</span>
+                {% endif %}
+
+                <div class="flex-grow-1 min-width-0">
+                    <div class="fw-semibold text-truncate">{{ req.from_user.username }}</div>
+                    <div class="small text-muted">{{ req.created_at|timesince }} önce istek gönderdi</div>
+                </div>
+
+                <div class="d-flex gap-2 flex-shrink-0">
                     <form method="post" action="{% url 'accounts:accept_friend_request' req.id %}" class="m-0">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-success">Kabul et</button>
@@ -20,7 +40,10 @@
                 </div>
             </div>
         {% empty %}
-            <div class="list-group-item text-muted">Bekleyen istek yok.</div>
+            <div class="list-group-item text-center text-muted py-5">
+                <div class="mb-2">Bekleyen arkadaşlık isteğin yok.</div>
+                <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-primary">Kullanıcıları keşfet</a>
+            </div>
         {% endfor %}
     </div>
 </div>

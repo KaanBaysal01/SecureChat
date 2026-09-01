@@ -7,9 +7,13 @@ class BootstrapFormMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
-            existing = field.widget.attrs.get("class", "")
-            field.widget.attrs["class"] = (existing + " form-control").strip()
+            widget = field.widget
 
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs["class"] = "form-check-input"
+            else:
+                existing = widget.attrs.get("class", "")
+                widget.attrs["class"] = (existing + " form-control").strip()
 
 class RegisterForm(BootstrapFormMixin, UserCreationForm):
     class Meta:
@@ -39,4 +43,4 @@ class BootstrapAuthenticationForm(BootstrapFormMixin, AuthenticationForm):
 class ProfileForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = User
-        fields = ("email", "profile_photo")
+        fields = ("email", "profile_photo","show_last_seen")

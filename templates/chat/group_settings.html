@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Grup ayarları{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3">
+    <a href="{% url 'chat:conversation_detail' conversation.id %}" class="text-decoration-none text-muted fs-4">&lsaquo;</a>
+    <h1 class="page-title">{{ conversation.name|default:"Grup" }}</h1>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Katılımcılar</strong>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge rounded-pill bg-secondary">{{ members|length }} kişi</span>
+            {% if is_admin %}
+                <button type="button" class="btn btn-sm btn-primary"
+                        data-bs-toggle="modal" data-bs-target="#add-member-modal">
+                    Katılımcı ekle
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="list-group list-group-flush">
+        {% for m in members %}
+            <div class="list-group-item d-flex align-items-center gap-3 py-3">
+                {% if m.profile_photo %}
+                    <img src="{{ m.profile_photo.url }}" alt="" class="avatar rounded-circle"
+                         style="width: 40px; height: 40px;">
+                {% else %}
+                    <span class="rounded-circle bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                          style="width: 40px; height: 40px; font-weight: 600;">{{ m.username|first|upper }}</span>
+                {% endif %}
+
+                <div class="flex-grow-1 min-width-0">
+                    <span class="fw-semibold">{{ m.username }}</span>
+                    {% if m == user %}<span class="text-muted small">(sen)</span>{% endif %}
+                    {% if m.id in admin_ids %}
+                        <span class="badge bg-success-subtle text-success-emphasis ms-1">yönetici</span>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    {% if m != user and m.id not in related_ids %}
+                        <form method="post" action="{% url 'accounts:send_friend_request' m.id %}" class="m-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Arkadaş ekle</button>
+                        </form>
+                    {% endif %}
+
+                    {% if is_admin and m != user %}
+                        {% if m.id not in admin_ids %}
+                            <form method="post" action="{% url 'chat:make_admin' conversation.id m.id %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Yönetici yap</button>
+                            </form>
+                        {% endif %}
+                        <form method="post" action="{% url 'chat:remove_member' conversation.id m.id %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Çıkar</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+            <div class="fw-semibold">Gruptan ayrıl</div>
+            <div class="small text-muted">Ayrıldıktan sonra bu sohbeti göremezsin.</div>
+        </div>
+        <form method="post" action="{% url 'chat:leave_group' conversation.id %}" class="m-0"
+              onsubmit="return confirm('Gruptan ayrılmak istediğine emin misin?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger">Ayrıl</button>
+        </form>
+    </div>
+</div>
+
+{% if invite_url %}
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="fw-semibold mb-1">Davet linki</div>
+        <div class="small text-muted mb-2">Bu linke sahip olan herkes gruba katılabilir. 7 gün geçerli.</div>
+        <div class="input-group">
+            <input type="text" id="invite-url" class="form-control form-control-sm" value="{{ invite_url }}" readonly>
+            <button id="copy-invite" type="button" class="btn btn-sm btn-outline-primary">Kopyala</button>
+        </div>
+        <form method="post" action="{% url 'chat:regenerate_invite' conversation.id %}" class="m-0 mt-2"
+                onsubmit="return confirm('Yeni link oluşturulacak ve eski link geçersiz olacak. Emin misin?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Linki yenile</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('copy-invite').addEventListener('click', function () {
+        const input = document.getElementById('invite-url');
+        const btn = document.getElementById('copy-invite');
+
+        function done() {
+            btn.textContent = 'Kopyalandı';
+            setTimeout(function () { btn.textContent = 'Kopyala'; }, 1500);
+        }
+
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(input.value).then(done);
+        } else {
+            input.select();
+            document.execCommand('copy');
+            done();
+        }
+    });
+</script>
+{% endif %}
+
+{% if is_admin %}
+    <div class="card shadow-sm mt-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-semibold text-danger">Grubu sil</div>
+                <div class="small text-muted">Grup ve tüm mesajlar herkes için silinir. Geri alınamaz.</div>
+            </div>
+            <form method="post" action="{% url 'chat:delete_conversation' conversation.id %}" class="m-0"
+                  onsubmit="return confirm('Grup ve tüm mesajlar silinecek. Emin misin?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Grubu sil</button>
+            </form>
+        </div>
+    </div>
+{% endif %}
+
+{% if is_admin %}
+<div class="modal fade" id="add-member-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Katılımcı ekle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush" style="max-height: 340px; overflow-y: auto;">
+                    {% for f in addable %}
+                        <div class="list-group-item d-flex align-items-center gap-3 py-2">
+                            {% if f.profile_photo %}
+                                <img src="{{ f.profile_photo.url }}" alt="" class="avatar rounded-circle"
+                                     style="width: 36px; height: 36px;">
+                            {% else %}
+                                <span class="rounded-circle bg-primary-subtle text-primary-emphasis d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                      style="width: 36px; height: 36px; font-weight: 600;">{{ f.username|first|upper }}</span>
+                            {% endif %}
+
+                            <span class="fw-semibold flex-grow-1">{{ f.username }}</span>
+
+                            <form method="post" action="{% url 'chat:add_member' conversation.id f.id %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Ekle</button>
+                            </form>
+                        </div>
+                    {% empty %}
+                        <div class="list-group-item text-muted text-center py-4">
+                            Eklenebilecek arkadaşın yok.
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

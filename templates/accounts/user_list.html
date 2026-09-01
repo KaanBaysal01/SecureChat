@@ -28,13 +28,15 @@
                     <span class="fw-semibold">{{ u.username }}</span>
                 </div>
 
-                {% if u.id not in related_ids %}
+                {% if u.id in friend_ids %}
+                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Arkadaşsınız</span>
+                {% elif u.id in related_ids %}
+                    <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">İstek gönderildi</span>
+                {% else %}
                     <form method="post" action="{% url 'accounts:send_friend_request' u.id %}" class="m-0">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-primary">Arkadaş ekle</button>
                     </form>
-                {% else %}
-                    <span class="text-muted small">ilişkili</span>
                 {% endif %}
             </div>
         {% empty %}
